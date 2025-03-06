@@ -73,10 +73,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: StreamBuilder<DocumentSnapshot>(
+      body: user == null
+          ? _buildGuestProfile() // Show guest profile UI
+          : StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc(user?.uid)
+            .doc(user.uid)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -201,6 +203,76 @@ class _ProfileScreenState extends State<ProfileScreen> {
             );
           }
         },
+      ),
+    );
+  }
+
+  // Build guest profile UI
+  Widget _buildGuestProfile() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Guest Icon
+            Icon(
+              Icons.person_outline,
+              size: 80,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 20),
+
+            // Guest Message
+            Text(
+              "You are browsing as a guest",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Login Prompt
+            Text(
+              "Log in or sign up to access your profile and save your progress.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 40),
+
+            // Login Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => LoginScreen()),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Color(0xFFA3D749),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                ),
+                child: const Text(
+                  'Log In / Sign Up',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

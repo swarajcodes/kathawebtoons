@@ -53,4 +53,9 @@ class AuthService {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
+  // Add this method to handle guest users
+  Future<void> signInAsGuest() async {
+    // No authentication is required for guest users
+    // We can simply navigate to the main navigation screen
+  }
 }

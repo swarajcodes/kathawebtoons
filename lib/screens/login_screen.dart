@@ -69,7 +69,11 @@ class LoginScreen extends StatelessWidget {
             SizedBox(height: 15),
             GestureDetector(
               onTap: () {
-                Navigator.pushNamed(context, '/navigate');
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (context) => MainNavigation()),
+                      (Route<dynamic> route) => false, // Remove all routes
+                );
               },
               child: Text(
                 'Continue as a guest',

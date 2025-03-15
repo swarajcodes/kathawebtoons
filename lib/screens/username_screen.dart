@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../main.dart';
 import 'home_screen.dart';
 import '../services/auth_service.dart';
 
@@ -70,7 +71,7 @@ class _UsernameScreenState extends State<UsernameScreen> {
                       await _authService.saveUsername(widget.user.uid, _usernameController.text);
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => HomeScreen()),
+                        MaterialPageRoute(builder: (context) => MainNavigation()),
                       );
                     }
                   },

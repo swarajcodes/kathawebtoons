@@ -330,31 +330,10 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _episodes.length , // +1 for the ad
+      itemCount: _episodes.length,
       itemBuilder: (context, index) {
-        if (index == _episodes.length / 2.floor()) {
-          // Insert ad in the middle of the list
-          // return Container(
-          //   margin: const EdgeInsets.symmetric(vertical: 16),
-          //   width: double.infinity,
-          //   height: 80,
-          //   decoration: BoxDecoration(
-          //     color: Colors.grey.shade800,
-          //     borderRadius: BorderRadius.circular(10),
-          //   ),
-          //   child: const Center(
-          //     child: Text(
-          //       'Advertisement',
-          //       style: TextStyle(color: Colors.white),
-          //     ),
-          //   ),
-          // );
-        }
-
-        final actualIndex = index > _episodes.length / 2.floor() ? index - 1 : index;
-        if (actualIndex >= _episodes.length) return const SizedBox.shrink();
-
-        final episode = _episodes[actualIndex];
+        // No ad logic needed for now
+        final episode = _episodes[index];
         return EpisodeListTile(
           episode: episode,
           onTap: () {

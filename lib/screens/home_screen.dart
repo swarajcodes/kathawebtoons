@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/hero_comic_card.dart';
+import '../widgets/hero_carousel.dart'; // Update import to use the new carousel
 import '../widgets/comic_tile.dart';
 import '../widgets/coming_soon_grid.dart';
 import '../models/comic_model.dart';
@@ -56,37 +56,34 @@ class _HomeScreenState extends State<HomeScreen> {
             }
 
             final comics = snapshot.data!;
-            final heroComic = comics.firstWhere(
-                  (comic) => comic.isHero,
-              orElse: () => Comic(
+
+            // Get all hero comics
+            final heroComics = comics.where((comic) => comic.isHero).toList();
+
+            // Fallback if no hero comics found
+            if (heroComics.isEmpty) {
+              heroComics.add(Comic(
                 id: 'default',
                 title: 'No Hero Comic',
                 author: 'Unknown',
                 coverImage: 'https://via.placeholder.com/150',
                 heroLandscapeImage: 'https://via.placeholder.com/150',
                 genre: [],
-              ),
-            );
+                isHero: true,
+              ));
+            }
 
-            final recommendedComic = comics.firstWhere(
-                  (comic) => comic.isRecommended,
-              orElse: () => Comic(
-                id: 'default',
-                title: 'No Recommended Comic',
-                author: 'Unknown',
-                coverImage: 'https://via.placeholder.com/150',
-                heroLandscapeImage: 'https://via.placeholder.com/150',
-                genre: [],
-              ),
-            );
+            // Get all recommended comics
+            final recommendedComics = comics.where((comic) => comic.isRecommended).toList();
 
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  HeroComicCard(
-                    comic: heroComic,
-                    onTap: () => _navigateToDetail(context, heroComic),
+                  // Hero Carousel instead of a single HeroComicCard
+                  HeroCarousel(
+                    heroComics: heroComics,
+                    onComicTap: (comic) => _navigateToDetail(context, comic),
                   ),
                   SizedBox(height: 20),
 
@@ -103,10 +100,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   SizedBox(height: 10),
-                  ComicTile(
-                    comic: recommendedComic,
-                    onTap: () => _navigateToDetail(context, recommendedComic),
+
+                  // Grid of recommended comics
+                  Container(
+                    height: 180, // Set an appropriate height for the horizontal list
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: recommendedComics.length,
+                      itemBuilder: (context, index) {
+                        return Container(
+                          margin: EdgeInsets.only(right: 16),
+                          child: ComicTile(
+                            comic: recommendedComics[index],
+                            onTap: () => _navigateToDetail(context, recommendedComics[index]),
+                          ),
+                        );
+                      },
+                    ),
                   ),
+
                   SizedBox(height: 20),
 
                   // Coming Soon Section

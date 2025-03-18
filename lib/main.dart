@@ -12,6 +12,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
+  // Prevent Screenshots & Screen Recording
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+
   runApp(MyApp());
 }
 
@@ -19,6 +27,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Katha Webtoons',
       theme: ThemeData(
         primarySwatch: Colors.blue,
@@ -27,24 +36,22 @@ class MyApp extends StatelessWidget {
         future: AuthService().getCurrentUser(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return SplashScreen(); // Show splash screen while checking login state
+            return SplashScreen();
           } else {
             if (snapshot.hasData && snapshot.data != null) {
-              return MainNavigation(); // User is logged in, go to main navigation
+              return MainNavigation();
             } else {
-              return LoginScreen(); // User is not logged in, go to login screen
+              return LoginScreen();
             }
           }
         },
-
       ),
       routes: {
-        '/guest': (context) => MainNavigation()
+        '/guest': (context) => MainNavigation(),
       },
     );
   }
 }
-
 
 class MainNavigation extends StatefulWidget {
   @override
@@ -71,18 +78,19 @@ class _MainNavigationState extends State<MainNavigation> {
       return false;
     }
 
-    SystemNavigator.pop(); // Exit the app if already on the home screen
+    SystemNavigator.pop();
     return false;
   }
 
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
-      onWillPop: _onWillPop, // Handle back button press
+      onWillPop: _onWillPop,
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         body: PageView(
           controller: _pageController,
-          physics: NeverScrollableScrollPhysics(), // Disable swipe navigation
+          physics: NeverScrollableScrollPhysics(),
           children: [
             HomeScreen(),
             MembershipScreen(),

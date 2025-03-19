@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../widgets/hero_carousel.dart'; // Update import to use the new carousel
+import '../models/webnovel_episode.dart';
+import '../widgets/hero_carousel.dart';
 import '../widgets/comic_tile.dart';
 import '../widgets/coming_soon_grid.dart';
 import '../models/comic_model.dart';
@@ -16,7 +17,7 @@ class ComicRepository {
   bool _isFetched = false;
 
   Future<List<Comic>> fetchComics() async {
-    if (_isFetched) return _comics; // Return cached comics if already fetched
+    if (_isFetched) return _comics;
 
     try {
       final snapshot = await FirebaseFirestore.instance.collection('comics').get();
@@ -26,6 +27,23 @@ class ComicRepository {
       print("Error fetching comics: $e");
     }
     return _comics;
+  }
+
+  // New method to fetch webnovel episodes
+  Future<List<WebnovelEpisode>> fetchWebnovelEpisodes(String comicId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('comics')
+          .doc(comicId)
+          .collection('webnovelEpisodes')
+          .orderBy('number', descending: false)
+          .get();
+
+      return snapshot.docs.map((doc) => WebnovelEpisode.fromFirestore(doc)).toList();
+    } catch (e) {
+      print("Error fetching webnovel episodes: $e");
+      return [];
+    }
   }
 }
 
@@ -76,6 +94,9 @@ class _HomeScreenState extends State<HomeScreen> {
             // Get all recommended comics
             final recommendedComics = comics.where((comic) => comic.isRecommended).toList();
 
+            // Get all webnovels
+            final webnovels = comics.where((comic) => comic.type == 'webnovel').toList();
+
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,6 +142,40 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
 
                   SizedBox(height: 20),
+
+                  // Webnovels Section
+                  if (webnovels.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Text(
+                        'Explore Webnovels 📚',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Container(
+                      height: 220,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: webnovels.length,
+                        itemBuilder: (context, index) {
+                          return Container(
+                            margin: EdgeInsets.only(right: 16),
+                            child: ComicTile(
+                              comic: webnovels[index],
+                              onTap: () => _navigateToDetail(context, webnovels[index]),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                  ],
 
                   // Coming Soon Section
                   Padding(

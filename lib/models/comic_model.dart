@@ -9,7 +9,8 @@ class Comic {
   final List<String> genre;
   final bool isHero;
   final bool isRecommended;
-  final bool isNew; // Added for "NEW" tag in UI
+  final bool isNew;
+  final String type; // New field: 'comic' or 'webnovel'
 
   Comic({
     required this.id,
@@ -21,6 +22,7 @@ class Comic {
     this.isHero = false,
     this.isRecommended = false,
     this.isNew = false,
+    this.type = 'comic', // Default to 'comic'
   });
 
   factory Comic.fromFirestore(DocumentSnapshot doc) {
@@ -35,6 +37,7 @@ class Comic {
       isHero: data['isHero'] ?? false,
       isRecommended: data['isRecommended'] ?? false,
       isNew: data['isNew'] ?? false,
+      type: data['type'] ?? 'comic', // Default to 'comic'
     );
   }
 }

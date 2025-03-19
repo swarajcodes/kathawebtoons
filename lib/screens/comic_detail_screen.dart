@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'package:archive/archive.dart';
+import 'package:kathawebtoons/screens/webnovel_episode_screen.dart';
 import '../models/comic_model.dart';
 import '../models/episode_model.dart';
+import '../models/webnovel_episode.dart';
 import '../widgets/comic_header.dart';
 import '../widgets/episode_list_tile.dart';
 import 'episode_detail_screen.dart';
+import 'home_screen.dart';
 
 class ComicDetailScreen extends StatefulWidget {
   final Comic comic;
@@ -19,15 +24,23 @@ class ComicDetailScreen extends StatefulWidget {
 class _ComicDetailScreenState extends State<ComicDetailScreen> {
   final ScrollController _scrollController = ScrollController();
   List<Episode> _episodes = [];
+  List<WebnovelEpisode> _webnovelEpisodes = [];
   bool _isLoadingEpisodes = true;
   bool _isCollapsingHeader = false;
+
+  // Add cached content to avoid repeated fetching
+  String? _cachedWebnovelContent;
+  bool _isLoadingWebnovelContent = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchEpisodes();
+    if (widget.comic.type == 'webnovel') {
+      _fetchWebnovelEpisodes();
+    } else {
+      _fetchEpisodes();
+    }
 
-    // Add scroll listener to track scrolling for collapsing header
     _scrollController.addListener(() {
       setState(() {
         _isCollapsingHeader = _scrollController.hasClients &&
@@ -61,10 +74,83 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _fetchWebnovelEpisodes() async {
+    try {
+      final episodes = await ComicRepository().fetchWebnovelEpisodes(widget.comic.id);
+      setState(() {
+        _webnovelEpisodes = episodes;
+        _isLoadingEpisodes = false;
+      });
+
+      // Prefetch first episode content for better performance
+      if (episodes.isNotEmpty) {
+        _prefetchWebnovelContent(episodes.first.docxUrl);
+      }
+    } catch (e) {
+      print("Error fetching webnovel episodes: $e");
+      setState(() {
+        _isLoadingEpisodes = false;
+      });
+    }
+  }
+
+  // New method to prefetch content once
+  Future<void> _prefetchWebnovelContent(String docxUrl) async {
+    if (_isLoadingWebnovelContent || _cachedWebnovelContent != null) return;
+
+    setState(() {
+      _isLoadingWebnovelContent = true;
+    });
+
+    try {
+      final content = await _fetchDocxContent(docxUrl);
+      setState(() {
+        _cachedWebnovelContent = content;
+        _isLoadingWebnovelContent = false;
+      });
+    } catch (e) {
+      print("Error prefetching webnovel content: $e");
+      setState(() {
+        _isLoadingWebnovelContent = false;
+      });
+    }
+  }
+
+  Future<String> _fetchDocxContent(String docxUrl) async {
+    try {
+      // Download the .docx file
+      final response = await http.get(Uri.parse(docxUrl));
+      if (response.statusCode == 200) {
+        // Decode the .docx file (which is a ZIP archive)
+        final archive = ZipDecoder().decodeBytes(response.bodyBytes);
+
+        // Find the document.xml file in the archive
+        final documentXml = archive.findFile('word/document.xml');
+        if (documentXml != null) {
+          // Extract text from the XML content
+          final xmlContent = String.fromCharCodes(documentXml.content);
+          return _extractTextFromXml(xmlContent);
+        } else {
+          return "Error: Could not find document.xml in the .docx file.";
+        }
+      } else {
+        return "Error: Failed to download .docx file.";
+      }
+    } catch (e) {
+      return "Error: $e";
+    }
+  }
+
+  String _extractTextFromXml(String xmlContent) {
+    // Simple XML parsing to extract text
+    final textBuffer = StringBuffer();
+    final regex = RegExp(r'<w:t[^>]*>([^<]+)</w:t>');
+    final matches = regex.allMatches(xmlContent);
+    for (final match in matches) {
+      textBuffer.write(match.group(1));
+      textBuffer.write(' ');
+    }
+    return textBuffer.toString().trim();
   }
 
   @override
@@ -84,7 +170,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                 pinned: true,
                 backgroundColor: Colors.black,
                 elevation: 0,
-                automaticallyImplyLeading: false, // Removing default back button
+                automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   title: _isCollapsingHeader
                       ? Text(
@@ -99,10 +185,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                   background: Stack(
                     fit: StackFit.expand,
                     children: [
-                      // Comic header (image with overlay)
                       ComicHeader(comic: widget.comic),
-
-                      // Custom back button - chevron style as in the image
                       Positioned(
                         top: 40,
                         left: 16,
@@ -115,8 +198,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                           ),
                         ),
                       ),
-
-                      // Comic title and author at the bottom - matching the image font sizes
                       Positioned(
                         bottom: 20,
                         left: 16,
@@ -152,7 +233,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                   padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 8.0, bottom: 8.0),
                   child: Row(
                     children: [
-                      // Action genre pill - smaller font, matching image
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10.0,
@@ -171,7 +251,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                           ),
                         ),
                       ),
-                      // Indian Mythology genre pill - smaller font, matching image
                       if (widget.comic.genre.length > 1)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -191,7 +270,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                           ),
                         ),
                       const Spacer(),
-                      // NEW tag - with the icon as shown in image
                       if (widget.comic.isNew)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -199,17 +277,12 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                             vertical: 2.0,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF4CAF50), // Matching the green in the image
+                            color: const Color(0xFF4CAF50),
                             borderRadius: BorderRadius.circular(4.0),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: const [
-                              // Icon(
-                              //   Icons.fiber_new,
-                              //   color: Colors.white,
-                              //   size: 14,
-                              // ),
                               SizedBox(width: 2),
                               Text(
                                 'NEW 🌟',
@@ -234,16 +307,16 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                       Tab(text: 'All Episodes'),
                     ],
                     indicatorColor: Colors.white,
-                    indicatorWeight: 2, // Thinner indicator as shown in image
-                    indicatorSize: TabBarIndicatorSize.label, // Indicator only under text
+                    indicatorWeight: 2,
+                    indicatorSize: TabBarIndicatorSize.label,
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.grey,
                     labelStyle: const TextStyle(
-                      fontSize: 14, // Smaller font size as shown in image
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                     unselectedLabelStyle: const TextStyle(
-                      fontSize: 14, // Smaller font size as shown in image
+                      fontSize: 14,
                       fontWeight: FontWeight.normal,
                     ),
                   ),
@@ -255,7 +328,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
           body: TabBarView(
             children: [
               _buildPreviewTab(),
-              _buildEpisodesTab(),
+              buildEpisodesTab(),
             ],
           ),
         ),
@@ -264,21 +337,27 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   Widget _buildPreviewTab() {
+    if (widget.comic.type == 'webnovel') {
+      return buildWebnovelPreview();
+    } else {
+      return _buildComicPreview();
+    }
+  }
+
+  Widget _buildComicPreview() {
     return SingleChildScrollView(
-      // padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Preview Image (First episode's image)
           if (_episodes.isNotEmpty &&
               (_episodes.first.previewImage.isNotEmpty ||
                   (_episodes.first.images.isNotEmpty))) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: CachedNetworkImage(
-                imageUrl: _episodes.first.previewImage.isNotEmpty ?
-                _episodes.first.previewImage :
-                _episodes.first.images.first,
+                imageUrl: _episodes.first.previewImage.isNotEmpty
+                    ? _episodes.first.previewImage
+                    : _episodes.first.images.first,
                 placeholder: (context, url) => Container(
                   height: 400,
                   color: Colors.grey.shade900,
@@ -312,43 +391,463 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
     );
   }
 
-  Widget _buildEpisodesTab() {
-    if (_isLoadingEpisodes) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
-    }
+  Widget buildWebnovelPreview() {
+    // Theme colors to match the reader screen
+    final Color _darkBackground = Color(0xFF1A1A1A);
+    final Color _darkText = Color(0xFFE0E0E0);
+    final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+    final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
 
-    if (_episodes.isEmpty) {
-      return const Center(
-        child: Text(
-          'No episodes found.',
-          style: TextStyle(color: Colors.white),
+    if (_isLoadingEpisodes) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _episodes.length,
-      itemBuilder: (context, index) {
-        // No ad logic needed for now
-        final episode = _episodes[index];
-        return EpisodeListTile(
-          episode: episode,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EpisodeDetailScreen(
-                  comic: widget.comic,
-                  episode: episode,
+    if (_webnovelEpisodes.isEmpty) {
+      return Center(
+        child: Text(
+          'No episodes found.',
+          style: TextStyle(color: _darkText),
+        ),
+      );
+    }
+
+    // Get the first episode
+    final firstEpisode = _webnovelEpisodes.first;
+
+    // Use cached content instead of FutureBuilder for better performance
+    if (_isLoadingWebnovelContent && _cachedWebnovelContent == null) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+        ),
+      );
+    }
+
+    // If no cached content yet but not loading, trigger prefetch
+    if (_cachedWebnovelContent == null && !_isLoadingWebnovelContent) {
+      _prefetchWebnovelContent(firstEpisode.docxUrl);
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+        ),
+      );
+    }
+
+    final content = _cachedWebnovelContent ?? "";
+
+    // Split content into paragraphs for better styling
+    final paragraphs = content.split('\n\n')
+        .where((p) => p.trim().isNotEmpty)
+        .take(5)  // Limit to first 5 paragraphs for preview
+        .toList();
+
+    return Container(
+      color: _darkBackground,
+      child: Column(
+        children: [
+          // Preview header
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _accentColor.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "${firstEpisode.title}",
+                    style: TextStyle(
+                      color: _accentColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Spacer(),
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _secondaryColor.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    "Preview",
+                    style: TextStyle(
+                      color: _accentColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Episode title
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Text(
+              firstEpisode.title,
+              style: TextStyle(
+                color: _darkText,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Merriweather',
+                height: 1.3,
+              ),
+            ),
+          ),
+
+          // Episode content
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ...paragraphs.map((paragraph) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Text(
+                        paragraph,
+                        style: TextStyle(
+                          color: _darkText.withOpacity(0.9),
+                          fontSize: 16,
+                          height: 1.6,
+                          fontFamily: 'Merriweather',
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+
+                  // "Continue reading" button
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 16.0),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => WebnovelEpisodeScreen(
+                                comic: widget.comic,
+                                episode: firstEpisode,
+                              ),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _accentColor,
+                          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: Text(
+                          "Continue Reading",
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // Preview disclaimer
+                  Center(
+                    child: Text(
+                      "This is a preview of the first episode",
+                      style: TextStyle(
+                        color: _secondaryColor,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildEpisodesTab() {
+    if (widget.comic.type == 'webnovel') {
+      return buildWebnovelEpisodesTab();
+    } else {
+      return buildComicEpisodesTab();
+    }
+  }
+
+  Widget buildWebnovelEpisodesTab() {
+    // Theme colors to match the reader screen
+    final Color _darkBackground = Color(0xFF1A1A1A);
+    final Color _darkText = Color(0xFFE0E0E0);
+    final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+    final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+
+    if (_isLoadingEpisodes) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+        ),
+      );
+    }
+
+    if (_webnovelEpisodes.isEmpty) {
+      return Center(
+        child: Text(
+          'No episodes found.',
+          style: TextStyle(color: _darkText),
+        ),
+      );
+    }
+
+    return Container(
+      color: _darkBackground,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _webnovelEpisodes.length,
+        itemBuilder: (context, index) {
+          final episode = _webnovelEpisodes[index];
+          return Card(
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: _darkBackground,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: _secondaryColor.withOpacity(0.3), width: 1),
+            ),
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WebnovelEpisodeScreen(
+                      comic: widget.comic,
+                      episode: episode,
+                    ),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    // Episode number in circle
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _accentColor.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        episode.number.toString(),
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    // Episode details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            episode.title,
+                            style: TextStyle(
+                              color: _darkText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Row(
+                            children: [
+                              // Container(
+                              //   padding: EdgeInsets.symmetric(
+                              //     horizontal: 8,
+                              //     vertical: 2,
+                              //   ),
+                              //   decoration: BoxDecoration(
+                              //     color: _secondaryColor.withOpacity(0.3),
+                              //     borderRadius: BorderRadius.circular(12),
+                              //   ),
+                              //   // child: Text(
+                              //   //   "99¢",
+                              //   //   style: TextStyle(
+                              //   //     color: _accentColor,
+                              //   //     fontSize: 12,
+                              //   //   ),
+                              //   // ),
+                              // ),
+                              SizedBox(width: 8),
+                              // Text(
+                              //   episode.releaseDate,
+                              //   style: TextStyle(
+                              //     color: _secondaryColor,
+                              //     fontSize: 12,
+                              //   ),
+                              // ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Arrow icon
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      color: _accentColor,
+                      size: 16,
+                    ),
+                  ],
                 ),
               ),
-            );
-          },
-        );
-      },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget buildComicEpisodesTab() {
+    // Theme colors to match the reader screen
+    final Color _darkBackground = Color(0xFF1A1A1A);
+    final Color _darkText = Color(0xFFE0E0E0);
+    final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+    final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+
+    if (_isLoadingEpisodes) {
+      return Center(
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+        ),
+      );
+    }
+
+    if (_episodes.isEmpty) {
+      return Center(
+        child: Text(
+          'No episodes found.',
+          style: TextStyle(color: _darkText),
+        ),
+      );
+    }
+
+    // Using the same styled card layout as webnovel episodes
+    return Container(
+      color: _darkBackground,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _episodes.length,
+        itemBuilder: (context, index) {
+          final episode = _episodes[index];
+          return Card(
+            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: _darkBackground,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: _secondaryColor.withOpacity(0.3), width: 1),
+            ),
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EpisodeDetailScreen(
+                      comic: widget.comic,
+                      episode: episode,
+                    ),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    // Episode number in circle
+                    Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: _accentColor.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        episode.number.toString(),
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 16),
+                    // Episode details
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            episode.title,
+                            style: TextStyle(
+                              color: _darkText,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          // if (episode.releaseDate.isNotEmpty)
+                          //   Padding(
+                          //     padding: const EdgeInsets.only(top: 4.0),
+                          //     child: Text(
+                          //       episode.releaseDate,
+                          //       style: TextStyle(
+                          //         color: _secondaryColor,
+                          //         fontSize: 12,
+                          //       ),
+                          //     ),
+                          //   ),
+                        ],
+                      ),
+                    ),
+                    // Arrow icon
+                    Icon(
+                      Icons.arrow_forward_ios,
+                      color: _accentColor,
+                      size: 16,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

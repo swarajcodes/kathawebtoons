@@ -103,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Grid of recommended comics
                   Container(
-                    height: 180, // Set an appropriate height for the horizontal list
+                    height: 220, // Set an appropriate height for the horizontal list
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: 16),

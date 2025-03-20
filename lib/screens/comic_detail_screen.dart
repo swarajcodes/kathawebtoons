@@ -12,6 +12,13 @@ import '../widgets/episode_list_tile.dart';
 import 'episode_detail_screen.dart';
 import 'home_screen.dart';
 
+
+// Theme colors to match the reader screen
+final Color _darkBackground = Color(0xFF1A1A1A);
+final Color _darkText = Color(0xFFE0E0E0);
+final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+
 class ComicDetailScreen extends StatefulWidget {
   final Comic comic;
 
@@ -158,7 +165,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: _darkBackground,
         extendBodyBehindAppBar: true,
         body: NestedScrollView(
           controller: _scrollController,
@@ -168,13 +175,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                 expandedHeight: 200.0,
                 floating: false,
                 pinned: true,
-                backgroundColor: Colors.black,
+                backgroundColor: _darkBackground,
                 elevation: 0,
                 automaticallyImplyLeading: false,
                 flexibleSpace: FlexibleSpaceBar(
                   title: _isCollapsingHeader
                       ? Text(
-                    widget.comic.title,
+                    "  ${widget.comic.title}",
                     style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -240,13 +247,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                         ),
                         margin: const EdgeInsets.only(right: 8.0),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade900,
+                          color: _accentColor.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(8.0),
                         ),
                         child: Text(
                           widget.comic.genre.isNotEmpty ? widget.comic.genre[0] : '',
                           style: const TextStyle(
-                            color: Colors.white,
+                            color:Colors.lightGreenAccent,
                             fontSize: 11,
                           ),
                         ),
@@ -258,13 +265,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                             vertical: 4.0,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade900,
+                            color: _accentColor.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(8.0),
                           ),
                           child: Text(
                             widget.comic.genre[1],
                             style: const TextStyle(
-                              color: Colors.white,
+                              color: Colors.lightGreenAccent,
                               fontSize: 11,
                             ),
                           ),
@@ -306,7 +313,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                       Tab(text: 'Preview'),
                       Tab(text: 'All Episodes'),
                     ],
-                    indicatorColor: Colors.white,
+                    indicatorColor: _accentColor,
                     indicatorWeight: 2,
                     indicatorSize: TabBarIndicatorSize.label,
                     labelColor: Colors.white,
@@ -392,11 +399,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   Widget buildWebnovelPreview() {
-    // Theme colors to match the reader screen
-    final Color _darkBackground = Color(0xFF1A1A1A);
-    final Color _darkText = Color(0xFFE0E0E0);
-    final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
-    final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
 
     if (_isLoadingEpisodes) {
       return Center(
@@ -870,7 +872,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
       bool overlapsContent,
       ) {
     return Container(
-      color: Colors.black,
+      color: _darkBackground,
       child: _tabBar,
     );
   }

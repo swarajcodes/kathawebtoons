@@ -8,6 +8,12 @@ import '../models/comic_model.dart';
 import '../models/episode_model.dart';
 import 'dart:async';
 
+// Theme colors to match WebnovelEpisodeScreen
+final Color _darkBackground = Color(0xFF1A1A1A);
+final Color _darkText = Color(0xFFE0E0E0);
+final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+
 class EpisodeDetailScreen extends StatefulWidget {
   final Comic comic;
   final Episode episode;
@@ -71,15 +77,20 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
 
     _verticalScrollController.addListener(() {
       if (_verticalScrollController.hasClients && !isHorizontalMode) {
-        if (_verticalScrollController.position.maxScrollExtent > 0) {
+        double offset = _verticalScrollController.offset;
+        double totalHeight = _verticalScrollController.position.maxScrollExtent;
+
+        if (totalHeight > 0) {
+          // Approximate current page based on offset ratio
+          int newPage = ((offset / totalHeight) * (widget.episode.images.length - 1)).round();
+
           setState(() {
-            _scrollProgress = _verticalScrollController.offset / _verticalScrollController.position.maxScrollExtent;
-            // Approximate current page based on scroll progress
-            _currentPage = (_scrollProgress * (widget.episode.images.length - 1)).round();
+            _currentPage = newPage.clamp(0, widget.episode.images.length - 1);
           });
         }
       }
     });
+
   }
 
   Future<void> _initBattery() async {
@@ -167,19 +178,24 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     _transformationController.value = Matrix4.identity();
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: _darkBackground,
       appBar: isFullscreenMode
           ? null
           : AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         title: Text(
           widget.episode.title,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(
+            color: _darkText,
+            fontFamily: 'Merriweather',
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: _accentColor),
         actions: [
           // Fullscreen button
           IconButton(
@@ -204,7 +220,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                   height: 48,
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
+                    color: _secondaryColor.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Row(
@@ -300,7 +316,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(0.7),
+                        _darkBackground.withOpacity(0.7),
                         Colors.transparent,
                       ],
                     ),
@@ -310,22 +326,30 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // Episode title - with dark gray color
-                        Expanded(
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _accentColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                           child: Text(
                             widget.episode.title,
                             style: TextStyle(
-                              color: Colors.grey.shade600,
+                              color: _accentColor,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        // Time display in dark gray
+                        // Time display
                         Text(
                           _currentTime,
                           style: TextStyle(
-                            color: Colors.grey.shade600,
+                            color: _secondaryColor,
                             fontSize: 14,
                           ),
                         ),
@@ -335,14 +359,14 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                           children: [
                             Icon(
                               _getBatteryIcon(),
-                              color: Colors.grey.shade600,
+                              color: _secondaryColor,
                               size: 16,
                             ),
                             const SizedBox(width: 4),
                             Text(
                               "$_batteryLevel%",
                               style: TextStyle(
-                                color: Colors.grey.shade600,
+                                color: _secondaryColor,
                                 fontSize: 14,
                               ),
                             ),
@@ -351,7 +375,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                                 padding: const EdgeInsets.only(left: 2.0),
                                 child: Icon(
                                   Icons.bolt,
-                                  color: Colors.grey.shade600,
+                                  color: _secondaryColor,
                                   size: 12,
                                 ),
                               ),
@@ -365,8 +389,9 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             // Exit fullscreen button when in fullscreen mode
             if (isFullscreenMode)
               Positioned(
+                left: 20,
                 bottom: 20,
-                right: 20,
+                right: 40,
                 child: GestureDetector(
                   onTap: _toggleFullscreenMode,
                   child: Container(
@@ -375,10 +400,10 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                       color: Colors.black.withOpacity(0.5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.fullscreen_exit,
-                      color: Colors.white,
-                      size: 24,
+                      color: _accentColor,
+                      size: 40,
                     ),
                   ),
                 ),

@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 class GoogleAuthButton extends StatelessWidget {
@@ -21,7 +22,7 @@ class GoogleAuthButton extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Image.asset(
-            'assets/google_logo.png',
+            'assets/google.png',
             width: 24,
             height: 24,
           ),

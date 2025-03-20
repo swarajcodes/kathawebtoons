@@ -85,7 +85,7 @@ flutter:
   #   - images/a_dot_ham.jpeg
   assets:
     - assets/katha_logo.png
-    - assets/google_logo.png
+    - assets/google.png
     - assets/default_profile.png
     - assets/crown.png
     - assets/splash_logo.png

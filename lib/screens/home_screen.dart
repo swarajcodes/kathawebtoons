@@ -70,9 +70,10 @@ class _HomeScreenState extends State<HomeScreen> {
           future: _comicFuture,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return Center(child: CircularProgressIndicator());
+              return Center(child: CircularProgressIndicator(
+                color: Color(0xFFA3D749),
+              ));
             }
-
             final comics = snapshot.data!;
 
             // Get all hero comics

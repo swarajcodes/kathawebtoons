@@ -53,10 +53,11 @@ class LoginScreen extends StatelessWidget {
             ),
             SizedBox(height: 0),
             Text(
-              "india's #1 webtoon platform",
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.black54,
+            "Feel the story, see the magic.",
+              style: GoogleFonts.poppins(
+                fontSize: 16,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w500
               ),
             ),
             Spacer(flex: 4),

@@ -592,11 +592,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   Widget buildEpisodesTab() {
-    if (widget.comic.type == 'webnovel') {
-      return buildWebnovelEpisodesTab();
-    } else {
-      return buildComicEpisodesTab();
-    }
+    return Column(
+      children: [
+        SizedBox(height: 20,),
+        Expanded(child: widget.comic.type == 'webnovel' ? buildWebnovelEpisodesTab() : buildComicEpisodesTab())
+      ],
+    );
+
   }
 
   Widget buildWebnovelEpisodesTab() {
@@ -612,7 +614,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
     if (_webnovelEpisodes.isEmpty) {
       return Center(
         child: Text(
-          'No episodes found.',
+          'Episodes Unavailable.',
           style: TextStyle(color: _darkText),
         ),
       );
@@ -625,96 +627,52 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
         itemCount: _webnovelEpisodes.length,
         itemBuilder: (context, index) {
           final episode = _webnovelEpisodes[index];
-          return Card(
-            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            color: _darkBackground,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: _secondaryColor.withOpacity(0.3), width: 1),
-            ),
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => WebnovelEpisodeScreen(
-                      comic: widget.comic,
-                      episode: episode,
+          return InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WebnovelEpisodeScreen(
+                    comic: widget.comic,
+                    episode: episode,
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 24),
+              child: Row(
+                children: [
+                  // Episode number in circle
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image(
+                      image: CachedNetworkImageProvider(widget.comic.coverImage),
+                      fit: BoxFit.fitWidth,
+                      height: 70,
+                      width: 70,
                     ),
                   ),
-                );
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    // Episode number in circle
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: Image(
-                        image: CachedNetworkImageProvider(widget.comic.coverImage),
-                        fit: BoxFit.fitWidth,
-                        height: 70,
-                        width: 70,
+                  SizedBox(width: 16),
+                  // Episode details
+                  Expanded(
+                    child:  Text(
+                      episode.title,
+                      style: TextStyle(
+                        color: _darkText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(width: 16),
-                    // Episode details
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            episode.title,
-                            style: TextStyle(
-                              color: _darkText,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 4),
-                          Row(
-                            children: [
-                              // Container(
-                              //   padding: EdgeInsets.symmetric(
-                              //     horizontal: 8,
-                              //     vertical: 2,
-                              //   ),
-                              //   decoration: BoxDecoration(
-                              //     color: _secondaryColor.withOpacity(0.3),
-                              //     borderRadius: BorderRadius.circular(12),
-                              //   ),
-                              //   // child: Text(
-                              //   //   "99¢",
-                              //   //   style: TextStyle(
-                              //   //     color: _accentColor,
-                              //   //     fontSize: 12,
-                              //   //   ),
-                              //   // ),
-                              // ),
-                              SizedBox(width: 8),
-                              // Text(
-                              //   episode.releaseDate,
-                              //   style: TextStyle(
-                              //     color: _secondaryColor,
-                              //     fontSize: 12,
-                              //   ),
-                              // ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Arrow icon
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      color: _accentColor,
-                      size: 16,
-                    ),
-                  ],
-                ),
+                  ),
+                  // Arrow icon
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: _accentColor,
+                    size: 16,
+                  ),
+                ],
               ),
             ),
           );
@@ -749,77 +707,52 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
         itemCount: _episodes.length,
         itemBuilder: (context, index) {
           final episode = _episodes[index];
-          return Card(
-            margin: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            color: _darkBackground,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: _secondaryColor.withOpacity(0.3), width: 1),
-            ),
-            child: InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => EpisodeDetailScreen(
-                      comic: widget.comic,
-                      episode: episode,
+          return InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => EpisodeDetailScreen(
+                    comic: widget.comic,
+                    episode: episode,
+                  ),
+                ),
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 24),
+              child: Row(
+                children: [
+                  // Episode images
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image(
+                      image: CachedNetworkImageProvider(episode.previewImage),
+                      fit: BoxFit.fitWidth,
+                      height: 70,
+                      width: 70,
                     ),
                   ),
-                );
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    // Episode images
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: Image(
-                        image: CachedNetworkImageProvider(episode.previewImage),
-                        fit: BoxFit.fitWidth,
-                        height: 70,
-                        width: 70,
+                  SizedBox(width: 16),
+                  // Episode details
+                  Expanded(
+                    child: Text(
+                      episode.title,
+                      style: TextStyle(
+                        color: _darkText,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(width: 16),
-                    // Episode details
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            episode.title,
-                            style: TextStyle(
-                              color: _darkText,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          // if (episode.releaseDate.isNotEmpty)
-                          //   Padding(
-                          //     padding: const EdgeInsets.only(top: 4.0),
-                          //     child: Text(
-                          //       episode.releaseDate,
-                          //       style: TextStyle(
-                          //         color: _secondaryColor,
-                          //         fontSize: 12,
-                          //       ),
-                          //     ),
-                          //   ),
-                        ],
-                      ),
-                    ),
-                    // Arrow icon
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      color: _accentColor,
-                      size: 16,
-                    ),
-                  ],
-                ),
+                  ),
+                  // Arrow icon
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: _accentColor,
+                    size: 16,
+                  ),
+                ],
               ),
             ),
           );

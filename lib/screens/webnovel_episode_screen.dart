@@ -30,10 +30,10 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   double _readProgress = 0.0;
 
   // Theme colors
-  final Color _darkBackground = Color(0xFF1A1A1A);
+  final Color _darkBackground = Color(0xFF000000);
   final Color _darkText = Color(0xFFE0E0E0);
-  final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
-  final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+  final Color _accentColor = Color(0xFFA3D749);
+  final Color _secondaryColor = Color(0xFF505050);
 
   @override
   void initState() {

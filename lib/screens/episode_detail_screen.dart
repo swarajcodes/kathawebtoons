@@ -73,6 +73,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
           });
         }
       }
+
     });
 
     _verticalScrollController.addListener(() {
@@ -80,16 +81,21 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
         double offset = _verticalScrollController.offset;
         double totalHeight = _verticalScrollController.position.maxScrollExtent;
 
+        print("Scroll Offset: $offset, Max Scroll Extent: $totalHeight");
+
         if (totalHeight > 0) {
-          // Approximate current page based on offset ratio
-          int newPage = ((offset / totalHeight) * (widget.episode.images.length - 1)).round();
+          double progress = (offset / totalHeight).clamp(0.0, 1.0);
 
           setState(() {
-            _currentPage = newPage.clamp(0, widget.episode.images.length - 1);
+            _scrollProgress = progress;
+            _currentPage = (progress * (widget.episode.images.length - 1)).round();
           });
+
+          print("Scroll Progress: $_scrollProgress, Current Page: $_currentPage");
         }
       }
     });
+
 
   }
 
@@ -178,7 +184,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     _transformationController.value = Matrix4.identity();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -204,213 +209,213 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
           ),
         ],
       ),
-      body: GestureDetector(
-        onTap: _toggleFullscreenMode,
-        child: Stack(
-          children: [
-            isHorizontalMode
-                ? _buildHorizontalView()
-                : _buildSynchronizedVerticalView(),
-            if (!isFullscreenMode)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 20, // Raised above the bottom edge
-                child: Container(
-                  height: 48,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: _secondaryColor.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Row(
-                    children: [
-                      // Page counter
-                      Padding(
-                        padding: const EdgeInsets.only(left: 16.0),
-                        child: Text(
-                          "${_currentPage + 1}/${widget.episode.images.length}",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      // Scroll progress bar
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: SliderTheme(
-                            data: SliderThemeData(
-                              trackHeight: 4,
-                              thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
-                              overlayShape: RoundSliderOverlayShape(overlayRadius: 12),
-                              activeTrackColor: Colors.lightGreenAccent,
-                              inactiveTrackColor: Colors.grey.shade600,
-                              thumbColor: Colors.white,
-                            ),
-                            child: Slider(
-                              value: isHorizontalMode
-                                  ? _currentPage.toDouble()
-                                  : _scrollProgress * (widget.episode.images.length - 1),
-                              min: 0,
-                              max: (widget.episode.images.length - 1).toDouble(),
-                              divisions: widget.episode.images.length > 1 ? widget.episode.images.length - 1 : 1,
-                              onChanged: (value) {
-                                if (isHorizontalMode) {
-                                  final page = value.toInt();
-                                  setState(() {
-                                    _currentPage = page;
-                                  });
-                                  _horizontalPageController.jumpToPage(page);
-                                } else {
-                                  // For vertical mode, calculate position based on progress
-                                  if (_verticalScrollController.hasClients) {
-                                    final targetPosition = (value / (widget.episode.images.length - 1)) *
-                                        _verticalScrollController.position.maxScrollExtent;
-                                    _verticalScrollController.jumpTo(targetPosition);
-                                  }
-                                }
-                              },
-                            ),
-                          ),
-                        ),
-                      ),
-                      // View mode toggle
-                      IconButton(
-                        icon: Icon(
-                          isHorizontalMode ? Icons.view_day : Icons.view_carousel,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {
-                          _resetZoom(); // Reset zoom when switching modes
-                          setState(() {
-                            isHorizontalMode = !isHorizontalMode;
-                          });
-
-                          // Handle mode switch with proper position
-                          if (isHorizontalMode) {
-                            // Switching to horizontal: set page based on scroll progress
-                            Future.delayed(Duration.zero, () {
-                              if (_horizontalPageController.hasClients) {
-                                _horizontalPageController.jumpToPage(_currentPage);
-                              }
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            // Fullscreen top overlay (episode title, time, and battery)
-            if (isFullscreenMode)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        _darkBackground.withOpacity(0.7),
-                        Colors.transparent,
-                      ],
+      body: SafeArea(
+        child: GestureDetector(
+          onTap: _toggleFullscreenMode,
+          child: Stack(
+            children: [
+              isHorizontalMode
+                  ? _buildHorizontalView()
+                  : _buildSynchronizedVerticalView(),
+              if (!isFullscreenMode)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 20, // Raised above the bottom edge
+                  child: Container(
+                    height: 48,
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: _secondaryColor.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(24),
                     ),
-                  ),
-                  child: SafeArea(
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Episode title - with dark gray color
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _accentColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                        // Page counter
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16.0),
                           child: Text(
-                            widget.episode.title,
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontSize: 14,
+                            "${_currentPage + 1}/${widget.episode.images.length}",
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        // Time display
-                        Text(
-                          _currentTime,
-                          style: TextStyle(
-                            color: _secondaryColor,
-                            fontSize: 14,
+                        // Scroll progress bar
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: SliderTheme(
+                              data: SliderThemeData(
+                                trackHeight: 4,
+                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                                overlayShape: RoundSliderOverlayShape(overlayRadius: 12),
+                                activeTrackColor: Colors.lightGreenAccent,
+                                inactiveTrackColor: Colors.grey.shade600,
+                                thumbColor: Colors.white,
+                              ),
+                              child: Slider(
+                                value: isHorizontalMode
+                                    ? _currentPage.toDouble()
+                                    : _scrollProgress * (widget.episode.images.length - 1),
+                                min: 0,
+                                max: (widget.episode.images.length - 1).toDouble(),
+                                divisions: widget.episode.images.length > 1 ? widget.episode.images.length - 1 : 1,
+                                onChanged: (value) {
+                                  if (isHorizontalMode) {
+                                    final page = value.toInt();
+                                    setState(() {
+                                      _currentPage = page;
+                                    });
+                                    _horizontalPageController.jumpToPage(page);
+                                  } else {
+                                    final targetOffset = (value / (widget.episode.images.length - 1)) *
+                                        _verticalScrollController.position.maxScrollExtent;
+
+                                    _verticalScrollController.jumpTo(targetOffset);
+                                  }
+                                },
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        // Battery percentage - with dark gray color and charging indicator
-                        Row(
-                          children: [
-                            Icon(
-                              _getBatteryIcon(),
-                              color: _secondaryColor,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              "$_batteryLevel%",
-                              style: TextStyle(
-                                color: _secondaryColor,
-                                fontSize: 14,
-                              ),
-                            ),
-                            if (_isCharging)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 2.0),
-                                child: Icon(
-                                  Icons.bolt,
-                                  color: _secondaryColor,
-                                  size: 12,
-                                ),
-                              ),
-                          ],
+                        // View mode toggle
+                        IconButton(
+                          icon: Icon(
+                            isHorizontalMode ? Icons.view_day : Icons.view_carousel,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            _resetZoom(); // Reset zoom when switching modes
+                            setState(() {
+                              isHorizontalMode = !isHorizontalMode;
+                            });
+
+                            // Handle mode switch with proper position
+                            if (isHorizontalMode) {
+                              // Switching to horizontal: set page based on scroll progress
+                              Future.delayed(Duration.zero, () {
+                                if (_horizontalPageController.hasClients) {
+                                  _horizontalPageController.jumpToPage(_currentPage);
+                                }
+                              });
+                            }
+                          },
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-            // Exit fullscreen button when in fullscreen mode
-            if (isFullscreenMode)
-              Positioned(
-                left: 20,
-                bottom: 20,
-                right: 40,
-                child: GestureDetector(
-                  onTap: _toggleFullscreenMode,
+              // Fullscreen top overlay (episode title, time, and battery)
+              if (isFullscreenMode)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          _darkBackground.withOpacity(0.7),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
-                    child: Icon(
-                      Icons.fullscreen_exit,
-                      color: _accentColor,
-                      size: 40,
+                    child: SafeArea(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Episode title - with dark gray color
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _accentColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              widget.episode.title,
+                              style: TextStyle(
+                                color: _accentColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Time display
+                          Text(
+                            _currentTime,
+                            style: TextStyle(
+                              color: _secondaryColor,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Battery percentage - with dark gray color and charging indicator
+                          Row(
+                            children: [
+                              Icon(
+                                _getBatteryIcon(),
+                                color: _secondaryColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "$_batteryLevel%",
+                                style: TextStyle(
+                                  color: _secondaryColor,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              if (_isCharging)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 2.0),
+                                  child: Icon(
+                                    Icons.bolt,
+                                    color: _secondaryColor,
+                                    size: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
+              // Exit fullscreen button when in fullscreen mode
+              if (isFullscreenMode)
+                Positioned(
+                  left: 20,
+                  bottom: 20,
+                  right: 40,
+                  child: GestureDetector(
+                    onTap: _toggleFullscreenMode,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.fullscreen_exit,
+                        color: _accentColor,
+                        size: 40,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
-      ),
+      )
     );
   }
 
@@ -430,52 +435,32 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
 
   // New synchronized vertical view with InteractiveViewer
   Widget _buildSynchronizedVerticalView() {
-    return GestureDetector(
-      onDoubleTap: _handleDoubleTap,
-      child: InteractiveViewer(
-        transformationController: _transformationController,
-        minScale: 1.0,
-        maxScale: 3.0,
-        constrained: false,
-        child: SingleChildScrollView(
-          controller: _verticalScrollController,
-          child: Column(
-            children: widget.episode.images.map((imageUrl) {
-              return Container(
-                width: MediaQuery.of(context).size.width,
-                child: Image(
-                  image: CachedNetworkImageProvider(imageUrl),
-                  fit: BoxFit.fitWidth,
-                  filterQuality: FilterQuality.high,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      height: MediaQuery.of(context).size.width * 1.5, // Estimate aspect ratio
-                      color: Colors.grey.shade900,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.lightGreenAccent,
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: MediaQuery.of(context).size.width * 1.5,
-                    color: Colors.grey.shade900,
-                    child: const Center(
-                      child: Icon(
-                        Icons.error,
-                        color: Colors.red,
-                        size: 50,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
+    return PhotoViewGallery.builder(
+      scrollPhysics: const BouncingScrollPhysics(),
+      scrollDirection: Axis.vertical,
+      itemCount: widget.episode.images.length,
+      builder: (context, index) {
+        return PhotoViewGalleryPageOptions(
+          imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
+          minScale: PhotoViewComputedScale.contained,
+          maxScale: PhotoViewComputedScale.covered * 3,
+          initialScale: PhotoViewComputedScale.contained,
+          heroAttributes: PhotoViewHeroAttributes(tag: "page_${widget.episode.id}_$index"),
+        );
+      },
+      onPageChanged: (index) {
+        setState(() {
+          _currentPage = index;
+          _scrollProgress = index / (widget.episode.images.length - 1);
+        });
+      },
+      loadingBuilder: (context, event) => Center(
+        child: CircularProgressIndicator(
+          value: event == null ? 0 : event.cumulativeBytesLoaded / event.expectedTotalBytes!,
+          color: Colors.lightGreenAccent,
         ),
       ),
+      backgroundDecoration: BoxDecoration(color: _darkBackground),
     );
   }
 

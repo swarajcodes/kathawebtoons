@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/webnovel_episode.dart';
 import '../widgets/hero_carousel.dart';
 import '../widgets/comic_tile.dart';
@@ -70,9 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
           future: _comicFuture,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return Center(child: CircularProgressIndicator(
-                color: Color(0xFFA3D749),
-              ));
+              return _buildShimmerLoading();
             }
             final comics = snapshot.data!;
 
@@ -197,6 +196,180 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  // Shimmer loading placeholder widgets
+  Widget _buildShimmerLoading() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Hero carousel shimmer
+          _buildHeroShimmer(),
+          SizedBox(height: 20),
+
+          // For You section shimmer
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'For You ✨',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          _buildHorizontalListShimmer(),
+
+          SizedBox(height: 20),
+
+          // Webnovels section shimmer
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Explore Webnovels 📚',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          _buildHorizontalListShimmer(),
+
+          SizedBox(height: 20),
+
+          // Coming Soon section shimmer
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            child: Text(
+              'Coming Soon 🥳',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          SizedBox(height: 10),
+          _buildGridShimmer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroShimmer() {
+    return Shimmer.fromColors(
+      baseColor: Color(0xFF333333),
+      highlightColor: Color(0xFF444444),
+      child: Container(
+        width: double.infinity,
+        height: 200,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHorizontalListShimmer() {
+    return Container(
+      height: 220,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        itemCount: 5, // Show 5 placeholder items
+        itemBuilder: (context, index) {
+          return Container(
+            margin: EdgeInsets.only(right: 16),
+            child: Shimmer.fromColors(
+              baseColor: Color(0xFF333333),
+              highlightColor: Color(0xFF444444),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 120,
+                    height: 160,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    width: 100,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Container(
+                    width: 80,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGridShimmer() {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          childAspectRatio: 0.75,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: 6, // Show 6 placeholder items
+        itemBuilder: (context, index) {
+          return Shimmer.fromColors(
+            baseColor: Color(0xFF333333),
+            highlightColor: Color(0xFF444444),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 6),
+                Container(
+                  width: 60,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

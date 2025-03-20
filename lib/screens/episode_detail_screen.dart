@@ -72,15 +72,12 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
           });
         }
       }
-
     });
 
     _verticalScrollController.addListener(() {
       if (_verticalScrollController.hasClients && !isHorizontalMode) {
         double offset = _verticalScrollController.offset;
         double totalHeight = _verticalScrollController.position.maxScrollExtent;
-
-        print("Scroll Offset: $offset, Max Scroll Extent: $totalHeight");
 
         if (totalHeight > 0) {
           double progress = (offset / totalHeight).clamp(0.0, 1.0);
@@ -89,13 +86,9 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             _scrollProgress = progress;
             _currentPage = (progress * (widget.episode.images.length - 1)).round();
           });
-
-          print("Scroll Progress: $_scrollProgress, Current Page: $_currentPage");
         }
       }
     });
-
-
   }
 
   Future<void> _initBattery() async {
@@ -191,11 +184,10 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
           ? null
           : AppBar(
         leading: IconButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          icon: Icon(Icons.arrow_back_ios_sharp)
-        ),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.arrow_back_ios_sharp)),
         backgroundColor: Colors.transparent,
         title: Text(
           widget.episode.title,
@@ -215,6 +207,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
         ],
       ),
       body: SafeArea(
+        bottom: false, // Disable bottom SafeArea to handle it manually
         child: GestureDetector(
           onTap: _toggleFullscreenMode,
           child: Stack(
@@ -226,7 +219,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 20, // Raised above the bottom edge
+                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
                   child: Container(
                     height: 48,
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -399,7 +392,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
               if (isFullscreenMode)
                 Positioned(
                   left: 20,
-                  bottom: 20,
+                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
                   right: 40,
                   child: GestureDetector(
                     onTap: _toggleFullscreenMode,
@@ -420,7 +413,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             ],
           ),
         ),
-      )
+      ),
     );
   }
 

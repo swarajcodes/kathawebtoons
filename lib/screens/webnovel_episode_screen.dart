@@ -165,132 +165,134 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(
-        child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
-        ),
-      )
-          : Column(
-        children: [
-          Expanded(
-            child: Container(
-              color: _darkBackground,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(20, 80, 20, 30),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Episode title and number
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _accentColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "${widget.episode.title}",
-                            style: TextStyle(
-                              color: _accentColor,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: _isLoading
+            ? Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+          ),
+        )
+            : Column(
+          children: [
+            Expanded(
+              child: Container(
+                color: _darkBackground,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 80, 20, 30),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Episode title and number
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _accentColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              "${widget.episode.title}",
+                              style: TextStyle(
+                                color: _accentColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
-                        Spacer(),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
+                          Spacer(),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _secondaryColor.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: _secondaryColor.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 20),
-                    // Chapter title
-                    Text(
-                      widget.episode.title,
-                      style: TextStyle(
-                        color: _darkText,
-                        fontSize: _fontSize + 8,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Merriweather',
-                        height: 1.3,
+                        ],
                       ),
-                    ),
-                    SizedBox(height: 30),
-                    // Content
-                    ..._paragraphs.map((paragraph) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 20.0),
-                        child: Text(
-                          paragraph,
-                          style: TextStyle(
-                            color: _darkText.withOpacity(0.9),
-                            fontSize: _fontSize,
-                            height: 1.6,
-                            fontFamily: 'Merriweather',
-                            letterSpacing: 0.3,
-                          ),
+                      SizedBox(height: 20),
+                      // Chapter title
+                      Text(
+                        widget.episode.title,
+                        style: TextStyle(
+                          color: _darkText,
+                          fontSize: _fontSize + 8,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Merriweather',
+                          height: 1.3,
                         ),
-                      );
-                    }).toList(),
-                    SizedBox(height: 50),
-                  ],
+                      ),
+                      SizedBox(height: 30),
+                      // Content
+                      ..._paragraphs.map((paragraph) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 20.0),
+                          child: Text(
+                            paragraph,
+                            style: TextStyle(
+                              color: _darkText.withOpacity(0.9),
+                              fontSize: _fontSize,
+                              height: 1.6,
+                              fontFamily: 'Merriweather',
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                      SizedBox(height: 50),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          // Bottom progress bar
-          Container(
-            height: 3,
-            child: LinearProgressIndicator(
-              value: _readProgress,
-              backgroundColor: _secondaryColor.withOpacity(0.2),
-              valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+            // Bottom progress bar
+            Container(
+              height: 3,
+              child: LinearProgressIndicator(
+                value: _readProgress,
+                backgroundColor: _secondaryColor.withOpacity(0.2),
+                valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+              ),
             ),
-          ),
-          Container(
-            color: _darkBackground,
-            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "${(_readProgress * 100).toInt()}%",
-                  style: TextStyle(
-                    color: _secondaryColor,
-                    fontSize: 12,
+            Container(
+              color: _darkBackground,
+              padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "${(_readProgress * 100).toInt()}%",
+                    style: TextStyle(
+                      color: _secondaryColor,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-                Text(
-                  "Scroll up to begin reading",
-                  style: TextStyle(
-                    color: _secondaryColor,
-                    fontSize: 12,
+                  Text(
+                    "Scroll up to begin reading",
+                    style: TextStyle(
+                      color: _secondaryColor,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-                Text(
-                  "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
-                  style: TextStyle(
-                    color: _secondaryColor,
-                    fontSize: 12,
+                  Text(
+                    "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
+                    style: TextStyle(
+                      color: _secondaryColor,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -14,9 +14,9 @@ import 'home_screen.dart';
 
 
 // Theme colors to match the reader screen
-final Color _darkBackground = Color(0xFF1A1A1A);
+final Color _darkBackground = Color(0xFF000000);
 final Color _darkText = Color(0xFFE0E0E0);
-final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+final Color _accentColor = Color(0xFFA3D749); // Light green accent
 final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
 
 class ComicDetailScreen extends StatefulWidget {
@@ -600,11 +600,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   Widget buildWebnovelEpisodesTab() {
-    // Theme colors to match the reader screen
-    final Color _darkBackground = Color(0xFF1A1A1A);
-    final Color _darkText = Color(0xFFE0E0E0);
-    final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
-    final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
 
     if (_isLoadingEpisodes) {
       return Center(
@@ -656,20 +651,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                 child: Row(
                   children: [
                     // Episode number in circle
-                    Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: _accentColor.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        episode.number.toString(),
-                        style: TextStyle(
-                          color: _accentColor,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image(
+                        image: CachedNetworkImageProvider(widget.comic.coverImage),
+                        fit: BoxFit.fitWidth,
+                        height: 70,
+                        width: 70,
                       ),
                     ),
                     SizedBox(width: 16),
@@ -736,12 +724,6 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   Widget buildComicEpisodesTab() {
-    // Theme colors to match the reader screen
-    final Color _darkBackground = Color(0xFF1A1A1A);
-    final Color _darkText = Color(0xFFE0E0E0);
-    final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
-    final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
-
     if (_isLoadingEpisodes) {
       return Center(
         child: CircularProgressIndicator(
@@ -753,7 +735,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
     if (_episodes.isEmpty) {
       return Center(
         child: Text(
-          'No episodes found.',
+          'Episodes unavailable.',
           style: TextStyle(color: _darkText),
         ),
       );
@@ -792,21 +774,14 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
                   children: [
-                    // Episode number in circle
-                    Container(
-                      width: 36,
-                      height: 36,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: _accentColor.withOpacity(0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        episode.number.toString(),
-                        style: TextStyle(
-                          color: _accentColor,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    // Episode images
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image(
+                        image: CachedNetworkImageProvider(episode.previewImage),
+                        fit: BoxFit.fitWidth,
+                        height: 70,
+                        width: 70,
                       ),
                     ),
                     SizedBox(width: 16),

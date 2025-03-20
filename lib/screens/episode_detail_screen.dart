@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:photo_view/photo_view_gallery.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../models/comic_model.dart';
 import '../models/episode_model.dart';
@@ -11,7 +10,7 @@ import 'dart:async';
 // Theme colors to match WebnovelEpisodeScreen
 final Color _darkBackground = Color(0xFF1A1A1A);
 final Color _darkText = Color(0xFFE0E0E0);
-final Color _accentColor = Color(0xFF7CBA8B); // Light green accent
+final Color _accentColor = Color(0xFFA3D749); // Light green accent
 final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
 
 class EpisodeDetailScreen extends StatefulWidget {
@@ -32,7 +31,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
   bool isHorizontalMode = false;
   bool isFullscreenMode = false;
   late PageController _horizontalPageController;
-  late ScrollController _verticalScrollController;
+  late PageController _verticalScrollController;
   int _currentPage = 0;
   double _scrollProgress = 0.0;
 
@@ -54,7 +53,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
   void initState() {
     super.initState();
     _horizontalPageController = PageController();
-    _verticalScrollController = ScrollController();
+    _verticalScrollController = PageController();
     _updateTime();
 
     // Initialize battery
@@ -191,6 +190,12 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
       appBar: isFullscreenMode
           ? null
           : AppBar(
+        leading: IconButton(
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: Icon(Icons.arrow_back_ios_sharp)
+        ),
         backgroundColor: Colors.transparent,
         title: Text(
           widget.episode.title,
@@ -435,32 +440,38 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
 
   // New synchronized vertical view with InteractiveViewer
   Widget _buildSynchronizedVerticalView() {
-    return PhotoViewGallery.builder(
-      scrollPhysics: const BouncingScrollPhysics(),
-      scrollDirection: Axis.vertical,
+    return ListView.builder(
+      controller: _verticalScrollController,
       itemCount: widget.episode.images.length,
-      builder: (context, index) {
-        return PhotoViewGalleryPageOptions(
-          imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
-          minScale: PhotoViewComputedScale.contained,
-          maxScale: PhotoViewComputedScale.covered * 3,
-          initialScale: PhotoViewComputedScale.contained,
-          heroAttributes: PhotoViewHeroAttributes(tag: "page_${widget.episode.id}_$index"),
+      itemBuilder: (context, index) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.6,
+          width: MediaQuery.of(context).size.width,
+          child: Hero(
+            tag: "page_${widget.episode.id}_$index",
+            child: PhotoView(
+              imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
+              minScale: PhotoViewComputedScale.contained,
+              maxScale: PhotoViewComputedScale.covered * 4,
+              initialScale: PhotoViewComputedScale.contained,
+              backgroundDecoration: const BoxDecoration(color: Colors.black),
+              loadingBuilder: (context, event) => Container(
+                color: Colors.grey.shade900,
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: Colors.lightGreenAccent,
+                  ),
+                ),
+              ),
+              tightMode: true,
+              gaplessPlayback: true,
+              enableRotation: false,
+              filterQuality: FilterQuality.high,
+              gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are captured
+            ),
+          ),
         );
       },
-      onPageChanged: (index) {
-        setState(() {
-          _currentPage = index;
-          _scrollProgress = index / (widget.episode.images.length - 1);
-        });
-      },
-      loadingBuilder: (context, event) => Center(
-        child: CircularProgressIndicator(
-          value: event == null ? 0 : event.cumulativeBytesLoaded / event.expectedTotalBytes!,
-          color: Colors.lightGreenAccent,
-        ),
-      ),
-      backgroundDecoration: BoxDecoration(color: _darkBackground),
     );
   }
 
@@ -476,8 +487,8 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
           tag: "page_${widget.episode.id}_$index",
           child: PhotoView(
             imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 3,
+            minScale: PhotoViewComputedScale.covered * 0.8,
+            maxScale: PhotoViewComputedScale.covered * 4,
             initialScale: PhotoViewComputedScale.contained,
             backgroundDecoration: const BoxDecoration(color: Colors.black),
             loadingBuilder: (context, event) => Container(
@@ -490,8 +501,18 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             ),
             tightMode: true,
             gaplessPlayback: true,
-            enableRotation: false,
+            enableRotation: false, // Disable rotation if not needed
             filterQuality: FilterQuality.high,
+            gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are detected properly
+            basePosition: Alignment.center, // Center the image when zooming
+            scaleStateChangedCallback: (scaleState) {
+              // Optional: Add callback for scale state changes
+              print("Scale State: $scaleState");
+            },
+            onScaleEnd: (context, details, controller) {
+              // Optional: Add callback for when scaling ends
+              print("Scale Ended");
+            },
           ),
         );
       },

@@ -399,6 +399,14 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
   }
 
   Widget buildWebnovelPreview() {
+    // Define the functions here
+    String cleanText(String text) {
+      return text.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
+    }
+
+    String normalizeText(String text) {
+      return text.replaceAll(RegExp(r'[^\x20-\x7E]'), '');
+    }
 
     if (_isLoadingEpisodes) {
       return Center(
@@ -439,12 +447,14 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
       );
     }
 
-    final content = _cachedWebnovelContent ?? "";
+    // Clean and normalize the cached content
+    final cleanedContent = cleanText(_cachedWebnovelContent ?? "");
+    final normalizedContent = normalizeText(cleanedContent);
 
     // Split content into paragraphs for better styling
-    final paragraphs = content.split('\n\n')
+    final paragraphs = normalizedContent.split('\n\n')
         .where((p) => p.trim().isNotEmpty)
-        .take(5)  // Limit to first 5 paragraphs for preview
+        .take(5)
         .toList();
 
     return Container(

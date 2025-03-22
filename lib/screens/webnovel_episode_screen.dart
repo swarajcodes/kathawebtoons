@@ -104,7 +104,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   }
 
   String _extractTextFromXml(String xmlContent) {
-    // Enhanced XML parsing to extract text with paragraph breaks
     final textBuffer = StringBuffer();
 
     // Pattern for paragraph breaks
@@ -114,8 +113,10 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     for (final paragraph in paragraphs) {
       final paragraphText = _extractTextFromParagraph(paragraph.group(0) ?? '');
       if (paragraphText.trim().isNotEmpty) {
-        textBuffer.writeln(paragraphText);
-        textBuffer.writeln();  // Add blank line between paragraphs
+        // Clean the text before adding it to the buffer
+        final cleanedText = cleanText(paragraphText);
+        textBuffer.writeln(cleanedText);
+        textBuffer.writeln(); // Add blank line between paragraphs
       }
     }
 
@@ -128,12 +129,25 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     final matches = regex.allMatches(paragraphXml);
 
     for (final match in matches) {
-      textBuffer.write(match.group(1));
+      final text = match.group(1)?.trim() ?? '';
+      if (text.isNotEmpty) {
+        textBuffer.write(normalizeText(text)); // Normalize text
+        textBuffer.write(' '); // Add space between text segments
+      }
     }
 
     return textBuffer.toString().trim();
   }
 
+  String cleanText(String text) {
+    // Remove any non-printable characters
+    return text.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
+  }
+
+  String normalizeText(String text) {
+    // Keep only ASCII printable characters
+    return text.replaceAll(RegExp(r'[^\x20-\x7E]'), '');
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(

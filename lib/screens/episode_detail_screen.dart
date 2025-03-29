@@ -178,6 +178,31 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Handle empty episode case
+    if (widget.episode.images.isEmpty) {
+      return Scaffold(
+        backgroundColor: _darkBackground,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          iconTheme: IconThemeData(color: _accentColor),
+          title: Text(
+            widget.episode.title,
+            style: TextStyle(
+              color: _darkText,
+              fontFamily: 'Merriweather',
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            'No images available in this episode',
+            style: TextStyle(color: _darkText),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _darkBackground,
       appBar: isFullscreenMode
@@ -219,7 +244,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
                   child: Container(
                     height: 48,
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -268,10 +293,11 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                                     });
                                     _horizontalPageController.jumpToPage(page);
                                   } else {
-                                    final targetOffset = (value / (widget.episode.images.length - 1)) *
-                                        _verticalScrollController.position.maxScrollExtent;
-
-                                    _verticalScrollController.jumpTo(targetOffset);
+                                    if (widget.episode.images.length > 1) {
+                                      final targetOffset = (value / (widget.episode.images.length - 1)) *
+                                          _verticalScrollController.position.maxScrollExtent;
+                                      _verticalScrollController.jumpTo(targetOffset);
+                                    }
                                   }
                                 },
                               ),
@@ -285,14 +311,12 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                             color: Colors.white,
                           ),
                           onPressed: () {
-                            _resetZoom(); // Reset zoom when switching modes
+                            _resetZoom();
                             setState(() {
                               isHorizontalMode = !isHorizontalMode;
                             });
 
-                            // Handle mode switch with proper position
                             if (isHorizontalMode) {
-                              // Switching to horizontal: set page based on scroll progress
                               Future.delayed(Duration.zero, () {
                                 if (_horizontalPageController.hasClients) {
                                   _horizontalPageController.jumpToPage(_currentPage);
@@ -327,7 +351,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Episode title - with dark gray color
+                          // Episode title
                           Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: 10,
@@ -356,7 +380,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // Battery percentage - with dark gray color and charging indicator
+                          // Battery percentage
                           Row(
                             children: [
                               Icon(
@@ -392,7 +416,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
               if (isFullscreenMode)
                 Positioned(
                   left: 20,
-                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
                   right: 40,
                   child: GestureDetector(
                     onTap: _toggleFullscreenMode,
@@ -431,7 +455,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     return Icons.battery_1_bar;
   }
 
-  // New synchronized vertical view with InteractiveViewer
   Widget _buildSynchronizedVerticalView() {
     return ListView.builder(
       controller: _verticalScrollController,
@@ -460,7 +483,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
               gaplessPlayback: true,
               enableRotation: false,
               filterQuality: FilterQuality.high,
-              gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are captured
+              gestureDetectorBehavior: HitTestBehavior.opaque,
             ),
           ),
         );
@@ -494,18 +517,10 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             ),
             tightMode: true,
             gaplessPlayback: true,
-            enableRotation: false, // Disable rotation if not needed
+            enableRotation: false,
             filterQuality: FilterQuality.high,
-            gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are detected properly
-            basePosition: Alignment.center, // Center the image when zooming
-            scaleStateChangedCallback: (scaleState) {
-              // Optional: Add callback for scale state changes
-              print("Scale State: $scaleState");
-            },
-            onScaleEnd: (context, details, controller) {
-              // Optional: Add callback for when scaling ends
-              print("Scale Ended");
-            },
+            gestureDetectorBehavior: HitTestBehavior.opaque,
+            basePosition: Alignment.center,
           ),
         );
       },

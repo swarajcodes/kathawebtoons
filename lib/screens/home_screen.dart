@@ -7,7 +7,6 @@ import '../widgets/comic_tile.dart';
 import '../widgets/coming_soon_grid.dart';
 import '../models/comic_model.dart';
 import 'comic_detail_screen.dart';
-import 'katha_screen.dart'; // Make sure to import your KathaScreen
 
 class ComicRepository {
   static final ComicRepository _instance = ComicRepository._internal();
@@ -31,6 +30,7 @@ class ComicRepository {
     return _comics;
   }
 
+  // New method to fetch webnovel episodes
   Future<List<WebnovelEpisode>> fetchWebnovelEpisodes(String comicId) async {
     try {
       final snapshot = await FirebaseFirestore.instance
@@ -101,94 +101,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Hero Carousel
+                  // Hero Carousel instead of a single HeroComicCard
                   HeroCarousel(
                     heroComics: heroComics,
                     onComicTap: (comic) => _navigateToDetail(context, comic),
-                  ),
-                  SizedBox(height: 20),
-
-                  // Bloodhound Baserville Section
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Text(
-                      'Bloodhound Baserville',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 10),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => KathaScreen()),
-                      );
-                    },
-                    child: Container(
-                      margin: EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        color: Color(0xFFA3D749),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.3),
-                            spreadRadius: 2,
-                            blurRadius: 5,
-                            offset: Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Bloodhound Baserville',
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Explore the mystical katha stories',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      'View',
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   SizedBox(height: 20),
 
@@ -208,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // Grid of recommended comics
                   Container(
-                    height: 220,
+                    height: 220, // Set an appropriate height for the horizontal list
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
                       padding: EdgeInsets.symmetric(horizontal: 16),
@@ -294,33 +210,6 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildHeroShimmer(),
           SizedBox(height: 20),
 
-          // Bloodhound Baserville shimmer
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text(
-              'Bloodhound Baserville',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          SizedBox(height: 10),
-          Shimmer.fromColors(
-            baseColor: Color(0xFF333333),
-            highlightColor: Color(0xFF444444),
-            child: Container(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              height: 120,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.white,
-              ),
-            ),
-          ),
-          SizedBox(height: 20),
-
           // For You section shimmer
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -395,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: EdgeInsets.symmetric(horizontal: 16),
-        itemCount: 5,
+        itemCount: 5, // Show 5 placeholder items
         itemBuilder: (context, index) {
           return Container(
             margin: EdgeInsets.only(right: 16),
@@ -452,7 +341,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
-        itemCount: 6,
+        itemCount: 6, // Show 6 placeholder items
         itemBuilder: (context, index) {
           return Shimmer.fromColors(
             baseColor: Color(0xFF333333),

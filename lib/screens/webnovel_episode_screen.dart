@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:archive/archive.dart';
 import 'package:flutter/services.dart';
-
+import 'package:translator/translator.dart';
 import '../models/comic_model.dart';
 import '../models/webnovel_episode.dart';
 
@@ -28,6 +28,25 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   bool _isDarkMode = true;
   ScrollController _scrollController = ScrollController();
   double _readProgress = 0.0;
+  bool _isTranslating = false;
+  bool _isTranslated = false;
+  late String _originalTitle;
+  late String _translatedTitle;
+  List<String> _originalParagraphs = [];
+  final translator = GoogleTranslator();
+  String _currentLanguage = 'Original';
+  // Update your _supportedLanguages map to include Indian languages:
+  final Map<String, String> _supportedLanguages = {
+    'Original': 'English',  // Keep original first
+    'bn': 'Bengali',
+    'gu': 'Gujarati',
+    'hi': 'Hindi',
+    'kn': 'Kannada',
+    'ml': 'Malayalam',
+    'or': 'Odia',
+    'ta': 'Tamil',
+    'te': 'Telugu',
+  };
 
   // Theme colors
   final Color _darkBackground = Color(0xFF000000);
@@ -38,6 +57,8 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   @override
   void initState() {
     super.initState();
+    _originalTitle = widget.episode.title;
+    _translatedTitle = widget.episode.title;
     _loadDocxContent();
     _scrollController.addListener(_updateReadProgress);
   }
@@ -148,6 +169,125 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     // Keep only ASCII printable characters
     return text.replaceAll(RegExp(r'[^\x20-\x7E]'), '');
   }
+
+  Future<void> _showLanguageDialog() async {
+    final selectedLanguage = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: _darkBackground,
+          title: Text(
+            'Select Language',
+            style: TextStyle(color: _accentColor),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _supportedLanguages.length,
+              itemBuilder: (BuildContext context, int index) {
+                final languageCode = _supportedLanguages.keys.elementAt(index);
+                final languageName = _supportedLanguages[languageCode];
+                return ListTile(
+                  title: Text(
+                    languageName!,
+                    style: TextStyle(
+                      color: _darkText,
+                      fontSize: 16,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context, languageCode);
+                  },
+                  selected: languageCode == _currentLanguage,
+                  selectedTileColor: _accentColor.withOpacity(0.2),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selectedLanguage != null && selectedLanguage != _currentLanguage) {
+      await _translateContent(targetLanguage: selectedLanguage);
+    }
+  }
+
+  Future<void> _translateContent({required String targetLanguage}) async {
+    if (_isTranslating || targetLanguage == 'Original') {
+      if (targetLanguage == 'Original' && _isTranslated) {
+        // Revert to original text
+        setState(() {
+          _paragraphs = List.from(_originalParagraphs);
+          _isTranslated = false;
+          _currentLanguage = 'Original';
+        });
+      }
+      return;
+    }
+
+    setState(() {
+      _isTranslating = true;
+    });
+
+    try {
+      final translateTitle = await translator.translate(
+        _originalTitle,
+        to: targetLanguage,
+      );
+      setState(() {
+        _translatedTitle = translateTitle.toString();
+      });
+
+      if(!_isTranslated)
+        {
+          _originalParagraphs = List.from(_paragraphs);
+
+          // Translate all content at once for better performance
+          final fullText = _paragraphs.join('\n\n');
+          final translation = await translator.translate(
+            fullText,
+            to: targetLanguage,
+          );
+
+          setState(() {
+            _paragraphs = translation.text.split('\n\n');
+            _isTranslated = true;
+            _currentLanguage = targetLanguage;
+          });
+        }
+      else{
+
+        // Translate all content at once for better performance
+        final fullText = _originalParagraphs.join('\n\n');
+        final translation = await translator.translate(
+          fullText,
+          to: targetLanguage,
+        );
+
+        setState(() {
+          _paragraphs = translation.text.split('\n\n');
+          _isTranslated = true;
+          _currentLanguage = targetLanguage;
+          print(_currentLanguage);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Translation failed: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isTranslating = false;
+      });
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,6 +301,46 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         actions: [
+          IconButton(
+            icon: _isTranslating
+                ? CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(_accentColor),
+            )
+                : Stack(
+              children: [
+                Icon(
+                  Icons.translate,
+                  color: _isTranslated ? _accentColor : _accentColor.withOpacity(0.6),
+                ),
+                if (_isTranslated)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: _accentColor,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: BoxConstraints(
+                        minWidth: 12,
+                        minHeight: 12,
+                      ),
+                      child: Text(
+                        _supportedLanguages[_currentLanguage]?.substring(0, 2) ?? '',
+                        style: TextStyle(
+                          color: _darkBackground,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            onPressed: _showLanguageDialog,
+          ),
           IconButton(
             icon: Icon(Icons.text_increase, color: _accentColor),
             onPressed: () {
@@ -198,43 +378,28 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Episode title and number
-                      Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _accentColor.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              "${widget.episode.title}",
-                              style: TextStyle(
-                                color: _accentColor,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _accentColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _currentLanguage != 'Original' ? _translatedTitle : _originalTitle,
+                          style: TextStyle(
+                            color: _accentColor,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
-                          Spacer(),
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _secondaryColor.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                       SizedBox(height: 20),
                       // Chapter title
                       Text(
-                        widget.episode.title,
+                        _currentLanguage != 'Original' ? _translatedTitle : _originalTitle,
                         style: TextStyle(
                           color: _darkText,
                           fontSize: _fontSize + 8,

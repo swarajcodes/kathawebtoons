@@ -6,12 +6,15 @@ import 'package:battery_plus/battery_plus.dart';
 import '../models/comic_model.dart';
 import '../models/episode_model.dart';
 import 'dart:async';
+import '../services/reading_progress_service.dart';
 
 // Theme colors to match WebnovelEpisodeScreen
 final Color _darkBackground = Color(0xFF1A1A1A);
 final Color _darkText = Color(0xFFE0E0E0);
 final Color _accentColor = Color(0xFFA3D749); // Light green accent
 final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+
+
 
 class EpisodeDetailScreen extends StatefulWidget {
   final Comic comic;

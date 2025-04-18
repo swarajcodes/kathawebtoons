@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:battery_plus/battery_plus.dart';
-import '../models/comic_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/episode_model.dart';
+import '../models/comic_model.dart' as comic_model;
 import 'dart:async';
 
 // Theme colors to match WebnovelEpisodeScreen
@@ -14,7 +16,7 @@ final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
 final String _fontFamily = 'Plus Jakarta Sans'; // Add font family variable
 
 class EpisodeDetailScreen extends StatefulWidget {
-  final Comic comic;
+  final comic_model.Comic comic;
   final Episode episode;
 
   const EpisodeDetailScreen({
@@ -34,6 +36,10 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
   late PageController _verticalScrollController;
   int _currentPage = 0;
   double _scrollProgress = 0.0;
+  List<Episode> _episodes = [];
+  bool _isLoadingEpisodes = true;
+  Episode? _nextEpisode;
+  bool _isLastEpisode = false; // Add flag to track if this is the last episode
 
   // Global zoom control for vertical mode
   final TransformationController _transformationController = TransformationController();
@@ -55,6 +61,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     _horizontalPageController = PageController();
     _verticalScrollController = PageController();
     _updateTime();
+    _fetchEpisodes();
 
     // Initialize battery
     _initBattery();
@@ -89,6 +96,51 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
         }
       }
     });
+  }
+
+  Future<void> _fetchEpisodes() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('comics')
+          .doc(widget.comic.id)
+          .collection('episodes')
+          .orderBy('number', descending: false)
+          .get();
+
+      final episodes = snapshot.docs.map((doc) {
+        return Episode.fromFirestore(doc);
+      }).toList();
+
+      setState(() {
+        _episodes = episodes;
+        _isLoadingEpisodes = false;
+        // Find the current episode and check if there are any episodes after it
+        final currentIndex = episodes.indexWhere((e) => e.id == widget.episode.id);
+        if (currentIndex != -1) {
+          // Check if there are any episodes with a higher number than the current one
+          final currentEpisodeNumber = widget.episode.number;
+          final hasNextEpisode = episodes.any((e) => e.number > currentEpisodeNumber);
+          
+          _isLastEpisode = !hasNextEpisode;
+          if (hasNextEpisode) {
+            // Find the next episode by number
+            _nextEpisode = episodes.firstWhere(
+              (e) => e.number > currentEpisodeNumber,
+              orElse: () => episodes[currentIndex + 1],
+            );
+          } else {
+            _nextEpisode = null;
+          }
+        }
+      });
+    } catch (e) {
+      print("Error fetching episodes: $e");
+      setState(() {
+        _isLoadingEpisodes = false;
+        _isLastEpisode = true;
+        _nextEpisode = null;
+      });
+    }
   }
 
   Future<void> _initBattery() async {
@@ -437,38 +489,96 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
 
   // New synchronized vertical view with InteractiveViewer
   Widget _buildSynchronizedVerticalView() {
-    return ListView.builder(
-      controller: _verticalScrollController,
-      itemCount: widget.episode.images.length,
-      itemBuilder: (context, index) {
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.6,
-          width: MediaQuery.of(context).size.width,
-          child: Hero(
-            tag: "page_${widget.episode.id}_$index",
-            child: PhotoView(
-              imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
-              minScale: PhotoViewComputedScale.contained,
-              maxScale: PhotoViewComputedScale.covered * 4,
-              initialScale: PhotoViewComputedScale.contained,
-              backgroundDecoration: const BoxDecoration(color: Colors.black),
-              loadingBuilder: (context, event) => Container(
-                color: Colors.grey.shade900,
-                child: const Center(
-                  child: CircularProgressIndicator(
-                    color: Colors.lightGreenAccent,
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _verticalScrollController,
+          itemCount: widget.episode.images.length + 1,
+          itemBuilder: (context, index) {
+            if (index == widget.episode.images.length) {
+              return SizedBox(
+                height: MediaQuery.of(context).size.height * 0.3,
+                width: MediaQuery.of(context).size.width,
+              );
+            }
+            return SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              width: MediaQuery.of(context).size.width,
+              child: Hero(
+                tag: "page_${widget.episode.id}_$index",
+                child: PhotoView(
+                  imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
+                  minScale: PhotoViewComputedScale.contained,
+                  maxScale: PhotoViewComputedScale.covered * 4,
+                  initialScale: PhotoViewComputedScale.contained,
+                  backgroundDecoration: const BoxDecoration(color: Colors.black),
+                  loadingBuilder: (context, event) => Container(
+                    color: Colors.grey.shade900,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.lightGreenAccent,
+                      ),
+                    ),
                   ),
+                  tightMode: true,
+                  gaplessPlayback: true,
+                  enableRotation: false,
+                  filterQuality: FilterQuality.high,
+                  gestureDetectorBehavior: HitTestBehavior.opaque,
                 ),
               ),
-              tightMode: true,
-              gaplessPlayback: true,
-              enableRotation: false,
-              filterQuality: FilterQuality.high,
-              gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are captured
+            );
+          },
+        ),
+        if (_nextEpisode != null && !_isLastEpisode && _currentPage == widget.episode.images.length - 1)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.of(context).padding.bottom + 100,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EpisodeDetailScreen(
+                        comic: widget.comic,
+                        episode: _nextEpisode!,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Next Chapter',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: _fontFamily,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward,
+                      color: Colors.black,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        );
-      },
+      ],
     );
   }
 

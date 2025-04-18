@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:archive/archive.dart';
 import 'package:kathawebtoons/screens/webnovel_episode_screen.dart';
 import '../models/comic_model.dart';
+import '../models/episode_model.dart' as episode_model;
 import '../models/webnovel_episode.dart';
 import '../widgets/comic_header.dart';
 import '../widgets/episode_list_tile.dart';
@@ -31,7 +32,7 @@ class ComicDetailScreen extends StatefulWidget {
 
 class _ComicDetailScreenState extends State<ComicDetailScreen> {
   final ScrollController _scrollController = ScrollController();
-  List<Episode> _episodes = [];
+  List<episode_model.Episode> _episodes = [];
   List<WebnovelEpisode> _webnovelEpisodes = [];
   bool _isLoadingEpisodes = true;
   bool _isCollapsingHeader = false;
@@ -72,7 +73,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
       final episodes = snapshot.docs.map((doc) {
         final data = doc.data();
         print("Processing episode: ${data['title']} with images: ${data['images']}");
-        return Episode.fromMap(data);
+        return episode_model.Episode.fromFirestore(doc);
       }).toList();
 
       setState(() {
@@ -754,12 +755,12 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                           : (episode.images.isNotEmpty ? episode.images.first : ''),
                       fit: BoxFit.cover,
                       height: 80,
-                      width: 80, // Changed from 45 to 80 for 1:1 aspect ratio
+                      width: 80,
                       placeholder: (context, url) {
                         print("Loading episode thumbnail: $url");
                         return Container(
                           height: 80,
-                          width: 80, // Changed from 45 to 80 for 1:1 aspect ratio
+                          width: 80,
                           color: Colors.grey[900],
                           child: Center(
                             child: CircularProgressIndicator(
@@ -773,7 +774,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                         print("Error loading episode thumbnail: $url, error: $error");
                         return Container(
                           height: 80,
-                          width: 80, // Changed from 45 to 80 for 1:1 aspect ratio
+                          width: 80,
                           color: Colors.grey[900],
                           child: Center(
                             child: Icon(

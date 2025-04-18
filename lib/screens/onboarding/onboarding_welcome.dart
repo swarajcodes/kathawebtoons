@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
+import '../../main.dart';
+import '../../screens/login_screen.dart';
 
 /// Welcome screen for new users during onboarding
 /// Allows users to set their username and select preferred genres
@@ -78,12 +80,28 @@ class _OnboardingWelcomeState extends State<OnboardingWelcome> {
       return;
     }
 
+    // Save user document in Firestore
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(FirebaseAuth.instance.currentUser!.uid)
+        .set({
+          'username': _usernameController.text,
+          'email': FirebaseAuth.instance.currentUser!.email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'onboardingCompleted': true,
+        });
+
     // Save selected genres
     await _authService.saveUserPreferences({
       'selectedGenres': _selectedGenres.toList(),
     });
 
-    Navigator.pushReplacementNamed(context, '/home');
+    // Navigate to home screen and clear the navigation stack
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => MainNavigation()),
+      (Route<dynamic> route) => false,
+    );
   }
 
   @override
@@ -91,148 +109,160 @@ class _OnboardingWelcomeState extends State<OnboardingWelcome> {
     // Enable button only when username is entered and at least one genre is selected
     final bool isButtonEnabled = _usernameController.text.isNotEmpty && _selectedGenres.isNotEmpty;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(height: 20),
-                      // App logo
-                      Image.asset(
-                        'assets/KathaLogo.png',
-                        height: 30,
-                      ),
-                      SizedBox(height: 50),
-                      // Username input field
-                      TextField(
-                        controller: _usernameController,
-                        style: TextStyle(color: Colors.white),
-                        onChanged: _validateUsername,
-                        decoration: InputDecoration(
-                          hintText: 'Enter your username',
-                          hintStyle: TextStyle(color: Colors.grey[600]),
-                          filled: true,
-                          fillColor: Colors.grey[900],
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 16,
-                          ),
-                          errorText: _usernameError,
-                          suffixIcon: _isValidating 
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : null,
+    return WillPopScope(
+      onWillPop: () async {
+        // Prevent back navigation - sign out and return to login
+        await _authService.signOut();
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+          (route) => false,
+        );
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(height: 20),
+                        // App logo
+                        Image.asset(
+                          'assets/KathaLogo.png',
+                          height: 30,
                         ),
-                      ),
-                      SizedBox(height: 40),
-                      // Genre selection title
-                      Text(
-                        'Select your favorite genres',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      SizedBox(height: 20),
-                      // Genre selection grid
-                      GridView.builder(
-                        shrinkWrap: true,
-                        physics: NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 3,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                        itemCount: _genres.length,
-                        itemBuilder: (context, index) {
-                          final genre = _genres[index];
-                          final isSelected = _selectedGenres.contains(genre['name']);
-                          
-                          return InkWell(
-                            onTap: () {
-                              setState(() {
-                                if (isSelected) {
-                                  _selectedGenres.remove(genre['name']);
-                                } else {
-                                  _selectedGenres.add(genre['name']);
-                                }
-                              });
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelected ? Color(0xFFA3D749) : Colors.grey[900],
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    genre['icon'],
-                                    color: isSelected ? Colors.black : Colors.white,
+                        SizedBox(height: 50),
+                        // Username input field
+                        TextField(
+                          controller: _usernameController,
+                          style: TextStyle(color: Colors.white),
+                          onChanged: _validateUsername,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your username',
+                            hintStyle: TextStyle(color: Colors.grey[600]),
+                            filled: true,
+                            fillColor: Colors.grey[900],
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            errorText: _usernameError,
+                            suffixIcon: _isValidating 
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    genre['name'],
-                                    style: TextStyle(
+                                )
+                              : null,
+                          ),
+                        ),
+                        SizedBox(height: 40),
+                        // Genre selection title
+                        Text(
+                          'Select your favorite genres',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        // Genre selection grid
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 3,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
+                          itemCount: _genres.length,
+                          itemBuilder: (context, index) {
+                            final genre = _genres[index];
+                            final isSelected = _selectedGenres.contains(genre['name']);
+                            
+                            return InkWell(
+                              onTap: () {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedGenres.remove(genre['name']);
+                                  } else {
+                                    _selectedGenres.add(genre['name']);
+                                  }
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected ? Color(0xFFA3D749) : Colors.grey[900],
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      genre['icon'],
                                       color: isSelected ? Colors.black : Colors.white,
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(width: 8),
+                                    Text(
+                                      genre['name'],
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.black : Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
+                        SizedBox(height: 20), // Add spacing before the button
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              // Get Started button at the bottom
+              Padding(
+                padding: EdgeInsets.all(20),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: isButtonEnabled ? _onGetStarted : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isButtonEnabled ? Color(0xFFA3D749) : Colors.grey[800],
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      SizedBox(height: 20), // Add spacing before the button
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Get Started button at the bottom
-            Padding(
-              padding: EdgeInsets.all(20),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: isButtonEnabled ? _onGetStarted : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isButtonEnabled ? Color(0xFFA3D749) : Colors.grey[800],
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
                     ),
-                  ),
-                  child: Text(
-                    'Get Started',
-                    style: TextStyle(
-                      color: isButtonEnabled ? Colors.black : Colors.grey[600],
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    child: Text(
+                      'Get Started',
+                      style: TextStyle(
+                        color: isButtonEnabled ? Colors.black : Colors.grey[600],
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

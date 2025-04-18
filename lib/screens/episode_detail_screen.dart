@@ -11,6 +11,7 @@ final Color _darkBackground = Color(0xFF1A1A1A);
 final Color _darkText = Color(0xFFE0E0E0);
 final Color _accentColor = Color(0xFFA3D749); // Light green accent
 final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+final String _fontFamily = 'Plus Jakarta Sans'; // Add font family variable
 
 class EpisodeDetailScreen extends StatefulWidget {
   final Comic comic;
@@ -233,9 +234,10 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                           padding: const EdgeInsets.only(left: 16.0),
                           child: Text(
                             "${_currentPage + 1}/${widget.episode.images.length}",
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
+                              fontFamily: _fontFamily,
                             ),
                           ),
                         ),
@@ -342,6 +344,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                                 color: _accentColor,
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
+                                fontFamily: _fontFamily,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -352,6 +355,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                             style: TextStyle(
                               color: _secondaryColor,
                               fontSize: 14,
+                              fontFamily: _fontFamily,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -369,6 +373,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                                 style: TextStyle(
                                   color: _secondaryColor,
                                   fontSize: 14,
+                                  fontFamily: _fontFamily,
                                 ),
                               ),
                               if (_isCharging)

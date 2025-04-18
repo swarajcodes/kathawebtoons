@@ -32,13 +32,24 @@ class WebnovelEpisode {
   /// Create a WebnovelEpisode instance from Firestore data
   factory WebnovelEpisode.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    // Handle null releaseDate safely
+    DateTime releaseDate;
+    try {
+      releaseDate = data['releaseDate'] != null 
+          ? (data['releaseDate'] as Timestamp).toDate() 
+          : DateTime.now();
+    } catch (e) {
+      print('Error parsing releaseDate for episode ${doc.id}: $e');
+      releaseDate = DateTime.now();
+    }
+    
     return WebnovelEpisode(
       id: doc.id,
       title: data['title'] ?? '',
       content: data['content'] ?? '',
       docxUrl: data['docxUrl'] ?? '',
       isLocked: data['isLocked'] ?? false,
-      releaseDate: (data['releaseDate'] as Timestamp).toDate(),
+      releaseDate: releaseDate,
     );
   }
 

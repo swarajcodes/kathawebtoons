@@ -75,6 +75,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-identity:18.0.1")
     implementation("com.google.android.gms:play-services-base:18.3.0")
     implementation("androidx.multidex:multidex:2.0.1")
+    implementation("com.google.android.gms:play-services-auth-api-phone:18.0.1")
 }
 
 flutter {

@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 
 class GoogleAuthButton extends StatelessWidget {
   final VoidCallback onPressed;
+  final bool isLoading;
 
-  const GoogleAuthButton({required this.onPressed, Key? key}) : super(key: key);
+  const GoogleAuthButton({
+    required this.onPressed,
+    this.isLoading = false,
+    Key? key
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -18,23 +23,32 @@ class GoogleAuthButton extends StatelessWidget {
         ),
         padding: EdgeInsets.symmetric(vertical: 15),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/google.png',
-            width: 24,
-            height: 24,
-          ),
-          SizedBox(width: 10),
-          Text(
-            "Continue with Google",
-            style: TextStyle(
-              fontSize: 16,
+      child: isLoading
+          ? SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/google.png',
+                  width: 24,
+                  height: 24,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  "Continue with Google",
+                  style: TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -18,6 +18,7 @@ final Color _darkBackground = Color(0xFF000000);
 final Color _darkText = Color(0xFFE0E0E0);
 final Color _accentColor = Color(0xFFA3D749); // Light green accent
 final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+final String _fontFamily = 'Plus Jakarta Sans'; // Add font family variable
 
 class ComicDetailScreen extends StatefulWidget {
   final Comic comic;
@@ -271,13 +272,15 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                     indicatorSize: TabBarIndicatorSize.label,
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.grey,
-                    labelStyle: const TextStyle(
+                    labelStyle: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      fontFamily: _fontFamily,
                     ),
-                    unselectedLabelStyle: const TextStyle(
+                    unselectedLabelStyle: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.normal,
+                      fontFamily: _fontFamily,
                     ),
                   ),
                 ),
@@ -349,6 +352,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
+                              fontFamily: _fontFamily,
                             ),
                           ),
                         ],
@@ -380,6 +384,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
+                    fontFamily: _fontFamily,
                   ),
                 ),
               ),
@@ -473,6 +478,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                       color: _accentColor,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      fontFamily: _fontFamily,
                     ),
                   ),
                 ),
@@ -492,6 +498,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                       color: _accentColor,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
+                      fontFamily: _fontFamily,
                     ),
                   ),
                 ),
@@ -565,6 +572,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                           style: TextStyle(
                             color: Colors.black87,
                             fontWeight: FontWeight.bold,
+                            fontFamily: _fontFamily,
                           ),
                         ),
                       ),
@@ -581,6 +589,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                         color: _secondaryColor,
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
+                        fontFamily: _fontFamily,
                       ),
                     ),
                   ),
@@ -617,7 +626,11 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
       return Center(
         child: Text(
           'Episodes Unavailable.',
-          style: TextStyle(color: _darkText),
+          style: TextStyle(
+            color: _darkText,
+            fontSize: 16,
+            fontFamily: _fontFamily,
+          ),
         ),
       );
     }
@@ -665,6 +678,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                         color: _darkText,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        fontFamily: _fontFamily,
                       ),
                     ),
                   ),
@@ -697,7 +711,11 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
       return Center(
         child: Text(
           'Episodes unavailable.',
-          style: TextStyle(color: _darkText),
+          style: TextStyle(
+            color: _darkText,
+            fontSize: 16,
+            fontFamily: _fontFamily,
+          ),
         ),
       );
     }
@@ -777,6 +795,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                         color: _darkText,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        fontFamily: _fontFamily,
                       ),
                     ),
                   ),

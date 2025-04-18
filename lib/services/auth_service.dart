@@ -38,6 +38,8 @@ class AuthService {
       // Ensure initialization
       await init();
       
+      print('Starting Google Sign In flow...');
+      
       // Start Google Sign In flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
@@ -45,6 +47,8 @@ class AuthService {
         return null;
       }
 
+      print('Google user signed in: ${googleUser.email}');
+      
       // Get authentication details
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       
@@ -53,6 +57,8 @@ class AuthService {
         return null;
       }
 
+      print('Google authentication successful, creating Firebase credential...');
+      
       // Create Firebase credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
@@ -60,20 +66,26 @@ class AuthService {
       );
 
       // Sign in to Firebase
+      print('Signing in to Firebase with Google credential...');
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
       final User? user = userCredential.user;
 
       if (user != null) {
+        print('Firebase sign in successful for user: ${user.uid}');
         // Check if user exists in Firestore
         final userDoc = await _firestore.collection('users').doc(user.uid).get();
         if (!userDoc.exists) {
-          // New user - needs onboarding
+          print('New user detected, needs onboarding');
+          // Set guest flag to false for new users
+          await _prefs?.setBool('is_guest', false);
           return user;
         }
         // Existing user - set guest flag to false
         await _prefs?.setBool('is_guest', false);
+        print('Existing user logged in successfully');
         return user;
       }
+      print('Firebase sign in returned null user');
       return null;
     } catch (e) {
       print('Error signing in with Google: $e');
@@ -82,7 +94,7 @@ class AuthService {
       } else if (e is PlatformException) {
         print('Platform Error: ${e.code} - ${e.message}');
       }
-      return null;
+      rethrow;
     }
   }
 

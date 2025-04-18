@@ -100,24 +100,50 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   Future<void> _checkAuthState() async {
-    await _authService.init();
-    final user = await _authService.getCurrentUser();
-    final isGuest = await _authService.isGuestUser();
+    try {
+      await _authService.init();
+      final user = await _authService.getCurrentUser();
+      final isGuest = await _authService.isGuestUser();
 
-    if (user != null && !isGuest) {
-      // Check if user has completed onboarding
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      
+      if (user != null && !isGuest) {
+        // Check if user has completed onboarding
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        
+        if (!userDoc.exists) {
+          // User hasn't completed onboarding - sign them out and redirect to login
+          print('Incomplete onboarding detected. Signing user out and redirecting to login.');
+          await _authService.signOut();
+          
+          setState(() {
+            _isLoading = false;
+          });
+          
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => LoginScreen()),
+              (route) => false,
+            );
+          });
+          return;
+        }
+        
+        setState(() {
+          _needsOnboarding = false;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _needsOnboarding = false;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error checking auth state: $e');
       setState(() {
-        _needsOnboarding = !userDoc.exists;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
-        _needsOnboarding = false;
         _isLoading = false;
       });
     }
@@ -131,10 +157,6 @@ class _MainNavigationState extends State<MainNavigation> {
           child: CircularProgressIndicator(),
         ),
       );
-    }
-
-    if (_needsOnboarding) {
-      return OnboardingWelcome();
     }
 
     return WillPopScope(

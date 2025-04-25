@@ -1,0 +1,678 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:photo_view/photo_view.dart';
+import 'package:battery_plus/battery_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/episode_model.dart';
+import '../models/comic_model.dart' as comic_model;
+import 'dart:async';
+import '../services/reading_progress_service.dart';
+
+
+// Theme colors to match WebnovelEpisodeScreen
+final Color _darkBackground = Color(0xFF1A1A1A);
+final Color _darkText = Color(0xFFE0E0E0);
+final Color _accentColor = Color(0xFFA3D749); // Light green accent
+final Color _secondaryColor = Color(0xFF505050); // Gray for secondary elements
+final String _fontFamily = 'Plus Jakarta Sans'; // Add font family variable
+
+class EpisodeDetailScreen extends StatefulWidget {
+  final comic_model.Comic comic;
+  final Episode episode;
+
+  const EpisodeDetailScreen({
+    Key? key,
+    required this.comic,
+    required this.episode,
+  }) : super(key: key);
+
+  @override
+  _EpisodeDetailScreenState createState() => _EpisodeDetailScreenState();
+}
+
+class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
+  bool isHorizontalMode = false;
+  bool isFullscreenMode = false;
+  late PageController _horizontalPageController;
+  late PageController _verticalScrollController;
+  int _currentPage = 0;
+  double _scrollProgress = 0.0;
+  List<Episode> _episodes = [];
+  bool _isLoadingEpisodes = true;
+  Episode? _nextEpisode;
+  bool _isLastEpisode = false; // Add flag to track if this is the last episode
+  final ReadingProgressService _progressService = ReadingProgressService();
+  bool _hasMarkedAsRead = false;
+
+
+  // Global zoom control for vertical mode
+  final TransformationController _transformationController = TransformationController();
+  double _previousScale = 1.0;
+
+  Future<void> _checkReadStatus() async {
+    final isRead = await _progressService.isEpisodeRead(
+      widget.comic.id,
+      widget.episode.id,
+    );
+
+    if (mounted) {
+      setState(() {
+        _hasMarkedAsRead = isRead;
+      });
+    }
+  }
+
+  Future<void> _markAsRead({double percentage = 1.0}) async {
+    if (_hasMarkedAsRead) return;
+
+    await _progressService.markEpisodeAsRead(
+      widget.comic.id,
+      widget.episode.id,
+      percentage: percentage,
+    );
+
+    setState(() {
+      _hasMarkedAsRead = true;
+    });
+  }
+
+  // Battery implementation
+  final Battery _battery = Battery();
+  int _batteryLevel = 0;
+  late StreamSubscription<BatteryState> _batteryStateSubscription;
+  bool _isCharging = false;
+
+  // Time display
+  String _currentTime = '';
+  late Timer _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _horizontalPageController = PageController();
+    _verticalScrollController = PageController();
+    _updateTime();
+    _fetchEpisodes();
+    _checkReadStatus();
+
+    // Initialize battery
+    _initBattery();
+
+    // Update time every minute
+    _timer = Timer.periodic(const Duration(minutes: 1), (Timer t) => _updateTime());
+
+    // Add listeners for page changes
+    _horizontalPageController.addListener(() {
+      if (_horizontalPageController.hasClients && isHorizontalMode) {
+        final page = _horizontalPageController.page?.round() ?? 0;
+        if (page != _currentPage) {
+          setState(() {
+            _currentPage = page;
+          });
+
+          // Calculate progress based on current page
+          double progress = (page + 1) / widget.episode.images.length;
+          setState(() {
+            _scrollProgress = progress;
+          });
+
+          // Mark as read when reaching 80% or more
+          if (progress > 0.8 && !_hasMarkedAsRead) {
+            _markAsRead(percentage: progress);
+          }
+        }
+      }
+    });
+
+    _verticalScrollController.addListener(() {
+      if (_verticalScrollController.hasClients && !isHorizontalMode) {
+        double offset = _verticalScrollController.offset;
+        double totalHeight = _verticalScrollController.position.maxScrollExtent;
+
+        if (totalHeight > 0) {
+          double progress = (offset / totalHeight).clamp(0.0, 1.0);
+
+          setState(() {
+            _scrollProgress = progress;
+            _currentPage = (progress * (widget.episode.images.length - 1)).round();
+          });
+
+          // Mark as read when scrolling to 80% or more
+          if (progress > 0.8 && !_hasMarkedAsRead) {
+            _markAsRead(percentage: progress);
+          }
+        }
+      }
+    });
+  }
+
+
+  Future<void> _fetchEpisodes() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('comics')
+          .doc(widget.comic.id)
+          .collection('episodes')
+          .orderBy('number', descending: false)
+          .get();
+
+      final episodes = snapshot.docs.map((doc) {
+        return Episode.fromFirestore(doc);
+      }).toList();
+
+      setState(() {
+        _episodes = episodes;
+        _isLoadingEpisodes = false;
+        // Find the current episode and check if there are any episodes after it
+        final currentIndex = episodes.indexWhere((e) => e.id == widget.episode.id);
+        if (currentIndex != -1) {
+          // Check if there are any episodes with a higher number than the current one
+          final currentEpisodeNumber = widget.episode.number;
+          final hasNextEpisode = episodes.any((e) => e.number > currentEpisodeNumber);
+          
+          _isLastEpisode = !hasNextEpisode;
+          if (hasNextEpisode) {
+            // Find the next episode by number
+            _nextEpisode = episodes.firstWhere(
+              (e) => e.number > currentEpisodeNumber,
+              orElse: () => episodes[currentIndex + 1],
+            );
+          } else {
+            _nextEpisode = null;
+          }
+        }
+      });
+    } catch (e) {
+      print("Error fetching episodes: $e");
+      setState(() {
+        _isLoadingEpisodes = false;
+        _isLastEpisode = true;
+        _nextEpisode = null;
+      });
+    }
+  }
+
+  Future<void> _initBattery() async {
+    // Get initial battery level
+    final batteryLevel = await _battery.batteryLevel;
+    setState(() {
+      _batteryLevel = batteryLevel;
+    });
+
+    // Listen for battery state changes (charging/discharging)
+    _batteryStateSubscription = _battery.onBatteryStateChanged.listen((BatteryState state) {
+      setState(() {
+        _isCharging = state == BatteryState.charging;
+      });
+      // Also update battery level when state changes
+      _updateBatteryLevel();
+    });
+
+    // Set up periodic battery level updates
+    Timer.periodic(const Duration(minutes: 5), (timer) {
+      _updateBatteryLevel();
+    });
+  }
+
+  Future<void> _updateBatteryLevel() async {
+    final batteryLevel = await _battery.batteryLevel;
+    setState(() {
+      _batteryLevel = batteryLevel;
+    });
+  }
+
+  void _updateTime() {
+    final now = DateTime.now();
+    setState(() {
+      _currentTime = '${_formatTime(now.hour)}:${_formatTime(now.minute)}';
+    });
+  }
+
+  String _formatTime(int time) {
+    return time.toString().padLeft(2, '0');
+  }
+
+  @override
+  void dispose() {
+    _horizontalPageController.dispose();
+    _verticalScrollController.dispose();
+    _transformationController.dispose();
+    _timer.cancel();
+    _batteryStateSubscription.cancel();
+
+    // Ensure we restore system UI when leaving the screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
+
+  // Handle double tap to reset zoom or zoom to a specific level
+  void _handleDoubleTap() {
+    final currentScale = _transformationController.value.getMaxScaleOnAxis();
+
+    if (currentScale > 1.1) {
+      // Reset zoom if already zoomed in
+      _transformationController.value = Matrix4.identity();
+    } else {
+      // Zoom to 2.0x if not zoomed in
+      final newMatrix = Matrix4.identity()..scale(2.0);
+      _transformationController.value = newMatrix;
+    }
+  }
+
+  void _toggleFullscreenMode() {
+    setState(() {
+      isFullscreenMode = !isFullscreenMode;
+    });
+
+    if (isFullscreenMode) {
+      // Hide status bar and navigation in fullscreen mode
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      // Show status bar and navigation when exiting fullscreen
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  void _resetZoom() {
+    _transformationController.value = Matrix4.identity();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _darkBackground,
+      appBar: isFullscreenMode
+          ? null
+          : AppBar(
+        leading: IconButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            icon: Icon(Icons.arrow_back_ios_sharp)),
+        backgroundColor: Colors.transparent,
+        title: Text(
+          widget.episode.title,
+          style: TextStyle(
+            color: _darkText,
+            fontFamily: 'Merriweather',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        iconTheme: IconThemeData(color: _accentColor),
+        actions: [
+          // Fullscreen button
+          IconButton(
+            icon: const Icon(Icons.fullscreen, color: Colors.white),
+            onPressed: _toggleFullscreenMode,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        bottom: false, // Disable bottom SafeArea to handle it manually
+        child: GestureDetector(
+          onTap: _toggleFullscreenMode,
+          child: Stack(
+            children: [
+              isHorizontalMode
+                  ? _buildHorizontalView()
+                  : _buildSynchronizedVerticalView(),
+              if (!isFullscreenMode)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
+                  child: Container(
+                    height: 48,
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: _secondaryColor.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      children: [
+                        // Page counter
+                        Padding(
+                          padding: const EdgeInsets.only(left: 16.0),
+                          child: Text(
+                            "${_currentPage + 1}/${widget.episode.images.length}",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: _fontFamily,
+                            ),
+                          ),
+                        ),
+                        // Scroll progress bar
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                            child: SliderTheme(
+                              data: SliderThemeData(
+                                trackHeight: 4,
+                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: 6),
+                                overlayShape: RoundSliderOverlayShape(overlayRadius: 12),
+                                activeTrackColor: Colors.lightGreenAccent,
+                                inactiveTrackColor: Colors.grey.shade600,
+                                thumbColor: Colors.white,
+                              ),
+                              child: Slider(
+                                value: isHorizontalMode
+                                    ? _currentPage.toDouble()
+                                    : _scrollProgress * (widget.episode.images.length - 1),
+                                min: 0,
+                                max: (widget.episode.images.length - 1).toDouble(),
+                                divisions: widget.episode.images.length > 1 ? widget.episode.images.length - 1 : 1,
+                                onChanged: (value) {
+                                  if (isHorizontalMode) {
+                                    final page = value.toInt();
+                                    setState(() {
+                                      _currentPage = page;
+                                    });
+                                    _horizontalPageController.jumpToPage(page);
+                                  } else {
+                                    final targetOffset = (value / (widget.episode.images.length - 1)) *
+                                        _verticalScrollController.position.maxScrollExtent;
+
+                                    _verticalScrollController.jumpTo(targetOffset);
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                        // View mode toggle
+                        IconButton(
+                          icon: Icon(
+                            isHorizontalMode ? Icons.view_day : Icons.view_carousel,
+                            color: Colors.white,
+                          ),
+                          onPressed: () {
+                            _resetZoom(); // Reset zoom when switching modes
+                            setState(() {
+                              isHorizontalMode = !isHorizontalMode;
+                            });
+
+                            // Handle mode switch with proper position
+                            if (isHorizontalMode) {
+                              // Switching to horizontal: set page based on scroll progress
+                              Future.delayed(Duration.zero, () {
+                                if (_horizontalPageController.hasClients) {
+                                  _horizontalPageController.jumpToPage(_currentPage);
+                                }
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // Fullscreen top overlay (episode title, time, and battery)
+              if (isFullscreenMode)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          _darkBackground.withOpacity(0.7),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Episode title - with dark gray color
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _accentColor.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              widget.episode.title,
+                              style: TextStyle(
+                                color: _accentColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: _fontFamily,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Time display
+                          Text(
+                            _currentTime,
+                            style: TextStyle(
+                              color: _secondaryColor,
+                              fontSize: 14,
+                              fontFamily: _fontFamily,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Battery percentage - with dark gray color and charging indicator
+                          Row(
+                            children: [
+                              Icon(
+                                _getBatteryIcon(),
+                                color: _secondaryColor,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "$_batteryLevel%",
+                                style: TextStyle(
+                                  color: _secondaryColor,
+                                  fontSize: 14,
+                                  fontFamily: _fontFamily,
+                                ),
+                              ),
+                              if (_isCharging)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 2.0),
+                                  child: Icon(
+                                    Icons.bolt,
+                                    color: _secondaryColor,
+                                    size: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              // Exit fullscreen button when in fullscreen mode
+              if (isFullscreenMode)
+                Positioned(
+                  left: 20,
+                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
+                  right: 40,
+                  child: GestureDetector(
+                    onTap: _toggleFullscreenMode,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.fullscreen_exit,
+                        color: _accentColor,
+                        size: 40,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper method to get appropriate battery icon based on level and charging state
+  IconData _getBatteryIcon() {
+    if (_isCharging) {
+      return Icons.battery_charging_full;
+    }
+
+    if (_batteryLevel >= 95) return Icons.battery_full;
+    if (_batteryLevel >= 75) return Icons.battery_6_bar;
+    if (_batteryLevel >= 50) return Icons.battery_4_bar;
+    if (_batteryLevel >= 25) return Icons.battery_3_bar;
+    if (_batteryLevel >= 10) return Icons.battery_2_bar;
+    return Icons.battery_1_bar;
+  }
+
+  // New synchronized vertical view with InteractiveViewer
+  Widget _buildSynchronizedVerticalView() {
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _verticalScrollController,
+          itemCount: widget.episode.images.length + 1,
+          itemBuilder: (context, index) {
+            if (index == widget.episode.images.length) {
+              return SizedBox(
+                height: MediaQuery.of(context).size.height * 0.3,
+                width: MediaQuery.of(context).size.width,
+              );
+            }
+            return SizedBox(
+              height: MediaQuery.of(context).size.height * 0.6,
+              width: MediaQuery.of(context).size.width,
+              child: Hero(
+                tag: "page_${widget.episode.id}_$index",
+                child: PhotoView(
+                  imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
+                  minScale: PhotoViewComputedScale.contained,
+                  maxScale: PhotoViewComputedScale.covered * 4,
+                  initialScale: PhotoViewComputedScale.contained,
+                  backgroundDecoration: const BoxDecoration(color: Colors.black),
+                  loadingBuilder: (context, event) => Container(
+                    color: Colors.grey.shade900,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.lightGreenAccent,
+                      ),
+                    ),
+                  ),
+                  tightMode: true,
+                  gaplessPlayback: true,
+                  enableRotation: false,
+                  filterQuality: FilterQuality.high,
+                  gestureDetectorBehavior: HitTestBehavior.opaque,
+                ),
+              ),
+            );
+          },
+        ),
+        if (_nextEpisode != null && !_isLastEpisode && _currentPage == widget.episode.images.length - 1)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: MediaQuery.of(context).padding.bottom + 100,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EpisodeDetailScreen(
+                        comic: widget.comic,
+                        episode: _nextEpisode!,
+                      ),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentColor,
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Next Chapter',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: _fontFamily,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.arrow_forward,
+                      color: Colors.black,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHorizontalView() {
+    return PageView.builder(
+      controller: _horizontalPageController,
+      itemCount: widget.episode.images.length,
+      physics: const BouncingScrollPhysics(),
+      pageSnapping: true,
+      scrollDirection: Axis.horizontal,
+      itemBuilder: (context, index) {
+        return Hero(
+          tag: "page_${widget.episode.id}_$index",
+          child: PhotoView(
+            imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
+            minScale: PhotoViewComputedScale.covered * 0.8,
+            maxScale: PhotoViewComputedScale.covered * 4,
+            initialScale: PhotoViewComputedScale.contained,
+            backgroundDecoration: const BoxDecoration(color: Colors.black),
+            loadingBuilder: (context, event) => Container(
+              color: Colors.grey.shade900,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.lightGreenAccent,
+                ),
+              ),
+            ),
+            tightMode: true,
+            gaplessPlayback: true,
+            enableRotation: false, // Disable rotation if not needed
+            filterQuality: FilterQuality.high,
+            gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are detected properly
+            basePosition: Alignment.center, // Center the image when zooming
+            scaleStateChangedCallback: (scaleState) {
+              // Optional: Add callback for scale state changes
+              print("Scale State: $scaleState");
+            },
+            onScaleEnd: (context, details, controller) {
+              // Optional: Add callback for when scaling ends
+              print("Scale Ended");
+            },
+          ),
+        );
+      },
+    );
+  }
+}

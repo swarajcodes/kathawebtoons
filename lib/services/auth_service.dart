@@ -217,17 +217,36 @@ class AuthService {
     };
   }
 
-  /// Save username to Firestore with validation
+  /// Save username with validation
   Future<Map<String, dynamic>> saveUsernameWithValidation(String uid, String username) async {
+    // First validate the username
     final validation = await validateUsername(username);
     if (!validation['isValid']) {
       return validation;
     }
 
-    await saveUsername(uid, username);
-    return {
-      'isValid': true,
-      'message': 'Username saved successfully'
-    };
+    try {
+      // Check if user document exists first
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      
+      if (userDoc.exists) {
+        // Update existing document
+        await _firestore.collection('users').doc(uid).update({
+          'username': username,
+        });
+      } else {
+        // Create new document
+        await _firestore.collection('users').doc(uid).set({
+          'username': username,
+          'email': _auth.currentUser?.email,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+      
+      return {'isValid': true, 'message': 'Username saved successfully'};
+    } catch (e) {
+      print('Error saving username: $e');
+      return {'isValid': false, 'message': 'Failed to save username: ${e.toString()}'};
+    }
   }
 }

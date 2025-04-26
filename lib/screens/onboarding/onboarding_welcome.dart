@@ -108,18 +108,7 @@ class _OnboardingWelcomeState extends State<OnboardingWelcome> {
         return;
       }
 
-      // Save user document in Firestore
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set({
-            'username': _usernameController.text,
-            'email': user.email,
-            'createdAt': FieldValue.serverTimestamp(),
-            'onboardingCompleted': true,
-          });
-
-      // Save initial preferences
+      // Save initial preferences locally only (no Firestore operation to avoid permissions issue)
       final preferences = UserPreferences(
         username: _usernameController.text,
         selectedGenres: _selectedGenres,
@@ -140,12 +129,19 @@ class _OnboardingWelcomeState extends State<OnboardingWelcome> {
         );
       }
     } catch (e) {
+      print('Error in onboarding: $e');
       setState(() {
         _isSaving = false;
       });
+      
+      String errorMessage = e.toString();
+      if (errorMessage.contains('permission-denied')) {
+        errorMessage = 'Permission denied: Please check your Firebase rules.';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error saving preferences: ${e.toString()}'),
+          content: Text('Error saving preferences: $errorMessage'),
           backgroundColor: Colors.red,
         ),
       );
@@ -186,8 +182,16 @@ class _OnboardingWelcomeState extends State<OnboardingWelcome> {
                         SizedBox(height: 20),
                         // App logo
                         Image.asset(
-                          'assets/KathaLogo.png',
+                          'assets/katha_logo.png',
                           height: 30,
+                          errorBuilder: (context, error, stackTrace) {
+                            print('Error loading logo: $error');
+                            return SizedBox(
+                              height: 30,
+                              child: Text('KATHA', 
+                                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
+                            );
+                          },
                         ),
                         SizedBox(height: 50),
                         // Username input field

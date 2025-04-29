@@ -326,11 +326,7 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
                   return Container(
                     height: 400,
                     color: Colors.grey[900],
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                      ),
-                    ),
+
                   );
                 },
                 errorWidget: (context, url, error) {

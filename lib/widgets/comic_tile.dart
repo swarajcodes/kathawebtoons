@@ -62,12 +62,6 @@ class _ComicTileState extends State<ComicTile> {
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       color: Colors.grey[900],
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      ),
                     ),
                     errorWidget: (context, url, error) => Container(
                       color: Colors.grey[900],

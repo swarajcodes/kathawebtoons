@@ -27,6 +27,9 @@ void main() async {
     persistenceEnabled: false,
   );
 
+  // TEMP: Run Firestore migration for user documents
+  // await migrateUserDocuments();
+
   // Configure system UI
   // Prevent screenshots and screen recording for content protection
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
@@ -87,22 +90,32 @@ class MainNavigation extends StatefulWidget {
   _MainNavigationState createState() => _MainNavigationState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
+class _MainNavigationState extends State<MainNavigation> with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
   bool _isLoading = true;
   bool _needsOnboarding = false;
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
+  late AnimationController _animationController;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
     _checkAuthState();
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -184,19 +197,44 @@ class _MainNavigationState extends State<MainNavigation> {
         ),
         bottomNavigationBar: SafeArea(
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: 10),
+            height: 60,
             decoration: BoxDecoration(
               color: Colors.black,
               border: Border(
                 top: BorderSide(color: Colors.grey.shade800, width: 0.5),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+            child: Stack(
               children: [
-                _buildNavItem(Icons.home, 'Home', 0),
-                _buildNavItem(Icons.card_membership_rounded, 'Membership', 1),
-                _buildNavItem(Icons.person, 'Profile', 2),
+                Row(
+                  children: [
+                    _buildNavButton(Icons.home, 'Home', 0),
+                    _buildNavButton(Icons.card_membership_rounded, 'Membership', 1),
+                    _buildNavButton(Icons.person, 'Profile', 2),
+                  ],
+                ),
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: AnimatedBuilder(
+                    animation: _animation,
+                    builder: (context, child) {
+                      final screenWidth = MediaQuery.of(context).size.width;
+                      final itemWidth = screenWidth / 3;
+                      return Transform.translate(
+                        offset: Offset(
+                          _animation.value * itemWidth,
+                          0,
+                        ),
+                        child: Container(
+                          width: itemWidth,
+                          height: 2,
+                          color: Colors.lightGreenAccent,
+                        ),
+                      );
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -211,6 +249,13 @@ class _MainNavigationState extends State<MainNavigation> {
       _selectedIndex = index;
     });
     _pageController.jumpToPage(index);
+    _animation = Tween<double>(
+      begin: _animation.value,
+      end: index.toDouble(),
+    ).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward(from: 0);
   }
 
   /// Handle back button press
@@ -229,25 +274,34 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   /// Build individual navigation items with icon and label
-  Widget _buildNavItem(IconData icon, String label, int index) {
-    return GestureDetector(
-      onTap: () => _onItemTapped(index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: _selectedIndex == index ? Colors.lightGreenAccent : Colors.white70,
-          ),
-          SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: _selectedIndex == index ? Colors.lightGreenAccent : Colors.white70,
-              fontSize: 12,
+  Widget _buildNavButton(IconData icon, String label, int index) {
+    final isSelected = _selectedIndex == index;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _onItemTapped(index),
+          child: Container(
+            height: double.infinity,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  color: isSelected ? Colors.lightGreenAccent : Colors.white70,
+                ),
+                SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.lightGreenAccent : Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

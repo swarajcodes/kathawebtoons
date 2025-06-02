@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,7 +10,9 @@ import '../models/episode_model.dart';
 import '../models/comic_model.dart' as comic_model;
 import 'dart:async';
 import '../services/reading_progress_service.dart';
-
+import '../services/comments_service.dart';
+import '../widgets/comments_bottom_sheet.dart';
+import '../models/episode_stats_model.dart';
 
 // Theme colors to match WebnovelEpisodeScreen
 final Color _darkBackground = Color(0xFF1A1A1A);
@@ -31,7 +35,8 @@ class EpisodeDetailScreen extends StatefulWidget {
   _EpisodeDetailScreenState createState() => _EpisodeDetailScreenState();
 }
 
-class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
+class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
+    with TickerProviderStateMixin {
   bool isHorizontalMode = false;
   bool isFullscreenMode = false;
   late PageController _horizontalPageController;
@@ -41,10 +46,19 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
   List<Episode> _episodes = [];
   bool _isLoadingEpisodes = true;
   Episode? _nextEpisode;
-  bool _isLastEpisode = false; // Add flag to track if this is the last episode
+  bool _isLastEpisode = false;
   final ReadingProgressService _progressService = ReadingProgressService();
   bool _hasMarkedAsRead = false;
 
+  // Add these new variables for comments and likes
+  final CommentsService _commentsService = CommentsService();
+  bool _isLiked = false;
+  EpisodeStats? _episodeStats;
+
+  // Animation for vertical interaction bar
+  late AnimationController _interactionBarController;
+  late Animation<Offset> _interactionBarAnimation;
+  bool _isInteractionBarVisible = false;
 
   // Global zoom control for vertical mode
   final TransformationController _transformationController = TransformationController();
@@ -77,6 +91,88 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     });
   }
 
+  Future<void> _loadEpisodeInteractionData() async {
+    try {
+      // First, recalculate stats to ensure accuracy
+      await _commentsService.recalculateEpisodeStats(
+        comicId: widget.comic.id,
+        episodeId: widget.episode.id,
+      );
+
+      // Then initialize episode stats if they don't exist
+      await _commentsService.initializeEpisodeStats(
+        comicId: widget.comic.id,
+        episodeId: widget.episode.id,
+      );
+
+      // Check if episode is liked
+      final isLiked = await _commentsService.hasUserLiked(
+        comicId: widget.comic.id,
+        episodeId: widget.episode.id,
+        targetId: widget.episode.id,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLiked = isLiked;
+        });
+      }
+
+      print('Episode interaction data loaded successfully');
+    } catch (e) {
+      print('Error loading episode interaction data: $e');
+    }
+  }
+
+  Future<void> _toggleEpisodeLike() async {
+    try {
+      print('Toggling like for episode: ${widget.episode.id}');
+      await _commentsService.toggleEpisodeLike(
+        comicId: widget.comic.id,
+        episodeId: widget.episode.id,
+      );
+
+      setState(() {
+        _isLiked = !_isLiked;
+      });
+
+      print('Episode like toggled successfully');
+    } catch (e) {
+      print('Error toggling episode like: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update like. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showComments() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withOpacity(0.2),
+      builder: (context) => CommentsBottomSheet(
+        comicId: widget.comic.id,
+        episodeId: widget.episode.id,
+      ),
+    );
+  }
+
+  void _toggleInteractionBar() {
+    setState(() {
+      _isInteractionBarVisible = !_isInteractionBarVisible;
+    });
+
+    if (_isInteractionBarVisible) {
+      _interactionBarController.forward();
+    } else {
+      _interactionBarController.reverse();
+    }
+  }
+
   // Battery implementation
   final Battery _battery = Battery();
   int _batteryLevel = 0;
@@ -95,6 +191,20 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     _updateTime();
     _fetchEpisodes();
     _checkReadStatus();
+    _loadEpisodeInteractionData();
+
+    // Initialize animation controller for interaction bar
+    _interactionBarController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _interactionBarAnimation = Tween<Offset>(
+      begin: Offset(1.0, 0.0), // Start from right (hidden)
+      end: Offset(0.0, 0.0),   // End at normal position (visible)
+    ).animate(CurvedAnimation(
+      parent: _interactionBarController,
+      curve: Curves.easeInOut,
+    ));
 
     // Initialize battery
     _initBattery();
@@ -111,13 +221,11 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             _currentPage = page;
           });
 
-          // Calculate progress based on current page
           double progress = (page + 1) / widget.episode.images.length;
           setState(() {
             _scrollProgress = progress;
           });
 
-          // Mark as read when reaching 80% or more
           if (progress > 0.8 && !_hasMarkedAsRead) {
             _markAsRead(percentage: progress);
           }
@@ -138,7 +246,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             _currentPage = (progress * (widget.episode.images.length - 1)).round();
           });
 
-          // Mark as read when scrolling to 80% or more
           if (progress > 0.8 && !_hasMarkedAsRead) {
             _markAsRead(percentage: progress);
           }
@@ -146,7 +253,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
       }
     });
   }
-
 
   Future<void> _fetchEpisodes() async {
     try {
@@ -164,18 +270,15 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
       setState(() {
         _episodes = episodes;
         _isLoadingEpisodes = false;
-        // Find the current episode and check if there are any episodes after it
         final currentIndex = episodes.indexWhere((e) => e.id == widget.episode.id);
         if (currentIndex != -1) {
-          // Check if there are any episodes with a higher number than the current one
           final currentEpisodeNumber = widget.episode.number;
           final hasNextEpisode = episodes.any((e) => e.number > currentEpisodeNumber);
-          
+
           _isLastEpisode = !hasNextEpisode;
           if (hasNextEpisode) {
-            // Find the next episode by number
             _nextEpisode = episodes.firstWhere(
-              (e) => e.number > currentEpisodeNumber,
+                  (e) => e.number > currentEpisodeNumber,
               orElse: () => episodes[currentIndex + 1],
             );
           } else {
@@ -194,22 +297,18 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
   }
 
   Future<void> _initBattery() async {
-    // Get initial battery level
     final batteryLevel = await _battery.batteryLevel;
     setState(() {
       _batteryLevel = batteryLevel;
     });
 
-    // Listen for battery state changes (charging/discharging)
     _batteryStateSubscription = _battery.onBatteryStateChanged.listen((BatteryState state) {
       setState(() {
         _isCharging = state == BatteryState.charging;
       });
-      // Also update battery level when state changes
       _updateBatteryLevel();
     });
 
-    // Set up periodic battery level updates
     Timer.periodic(const Duration(minutes: 5), (timer) {
       _updateBatteryLevel();
     });
@@ -238,26 +337,12 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     _horizontalPageController.dispose();
     _verticalScrollController.dispose();
     _transformationController.dispose();
+    _interactionBarController.dispose();
     _timer.cancel();
     _batteryStateSubscription.cancel();
 
-    // Ensure we restore system UI when leaving the screen
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
-  }
-
-  // Handle double tap to reset zoom or zoom to a specific level
-  void _handleDoubleTap() {
-    final currentScale = _transformationController.value.getMaxScaleOnAxis();
-
-    if (currentScale > 1.1) {
-      // Reset zoom if already zoomed in
-      _transformationController.value = Matrix4.identity();
-    } else {
-      // Zoom to 2.0x if not zoomed in
-      final newMatrix = Matrix4.identity()..scale(2.0);
-      _transformationController.value = newMatrix;
-    }
   }
 
   void _toggleFullscreenMode() {
@@ -266,16 +351,49 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     });
 
     if (isFullscreenMode) {
-      // Hide status bar and navigation in fullscreen mode
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
-      // Show status bar and navigation when exiting fullscreen
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
 
   void _resetZoom() {
     _transformationController.value = Matrix4.identity();
+  }
+
+  Widget _buildVerticalInteractionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    String? countText,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 24,
+            ),
+            if (countText != null && countText.isNotEmpty) ...[
+              SizedBox(height: 4),
+              Text(
+                countText,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -301,7 +419,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
         ),
         iconTheme: IconThemeData(color: _accentColor),
         actions: [
-          // Fullscreen button
           IconButton(
             icon: const Icon(Icons.fullscreen, color: Colors.white),
             onPressed: _toggleFullscreenMode,
@@ -309,19 +426,185 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
         ],
       ),
       body: SafeArea(
-        bottom: false, // Disable bottom SafeArea to handle it manually
+        bottom: false,
         child: GestureDetector(
-          onTap: _toggleFullscreenMode,
+          onTap: () {
+            if (!isFullscreenMode) {
+              _toggleFullscreenMode();
+            }
+          },
           child: Stack(
             children: [
               isHorizontalMode
                   ? _buildHorizontalView()
                   : _buildSynchronizedVerticalView(),
+
+              // Vertical Interaction Bar (Right Side) - Matching Figma Design
+              if (!isFullscreenMode)
+                Positioned(
+                  right: 0,
+                  top: MediaQuery.of(context).size.height * 0.3,
+                  bottom: MediaQuery.of(context).size.height * 0.3,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // Sliding Interaction Panel with FIXED overflow
+                      SlideTransition(
+                        position: _interactionBarAnimation,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(20),
+                            bottomLeft: Radius.circular(20),
+                          ),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                            child: Container(
+                              width: 65,
+                              constraints: BoxConstraints(
+                                maxHeight: MediaQuery.of(context).size.height * 0.4, // Add max height constraint
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.3),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(20),
+                                  bottomLeft: Radius.circular(20),
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.1),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
+                              ),
+                              child: SingleChildScrollView( // Add scrollable container
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min, // FIXED: Use min instead of max
+                                  mainAxisAlignment: MainAxisAlignment.center, // FIXED: Use center instead of spaceEvenly
+                                  children: [
+                                    SizedBox(height: 12), // Add fixed spacing
+
+                                    // Like Button
+                                    StreamBuilder<EpisodeStats?>(
+                                      stream: _commentsService.getEpisodeStats(
+                                        comicId: widget.comic.id,
+                                        episodeId: widget.episode.id,
+                                      ),
+                                      builder: (context, snapshot) {
+                                        final likes = snapshot.data?.totalLikes ?? 0;
+                                        return _buildGlassmorphicInteractionButton(
+                                          icon: _isLiked ? Icons.favorite : Icons.favorite_border,
+                                          color: _isLiked ? Colors.red : Colors.white,
+                                          onTap: _toggleEpisodeLike,
+                                          countText: likes.toString(),
+                                        );
+                                      },
+                                    ),
+
+                                    SizedBox(height: 16), // Fixed spacing between buttons
+
+                                    // Comments Button
+                                    StreamBuilder<EpisodeStats?>(
+                                      stream: _commentsService.getEpisodeStats(
+                                        comicId: widget.comic.id,
+                                        episodeId: widget.episode.id,
+                                      ),
+                                      builder: (context, snapshot) {
+                                        final comments = snapshot.data?.totalComments ?? 0;
+                                        return _buildGlassmorphicInteractionButton(
+                                          icon: Icons.chat_bubble_outline,
+                                          color: Colors.white,
+                                          onTap: _showComments,
+                                          countText: comments.toString(),
+                                        );
+                                      },
+                                    ),
+
+                                    SizedBox(height: 16), // Fixed spacing between buttons
+
+                                    // Share Button
+                                    _buildGlassmorphicInteractionButton(
+                                      icon: Icons.share,
+                                      color: Colors.white,
+                                      onTap: () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Share functionality coming soon!'),
+                                            backgroundColor: Color(0xFFA3D749),
+                                          ),
+                                        );
+                                      },
+                                    ),
+
+                                    SizedBox(height: 12), // Add bottom spacing
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Square Toggle Button - Always stays on the right
+                      GestureDetector(
+                        onTap: _toggleInteractionBar,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(15),
+                            bottomLeft: Radius.circular(15),
+                          ),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              width: 35,
+                              height: 70,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.4),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: Radius.circular(15),
+                                  bottomLeft: Radius.circular(15),
+                                ),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.15),
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: AnimatedRotation(
+                                  turns: _isInteractionBarVisible ? 0.5 : 0.0,
+                                  duration: Duration(milliseconds: 300),
+                                  child: Icon(
+                                    Icons.arrow_back_ios,
+                                    color: Colors.white.withOpacity(0.9),
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Bottom Control Bar (Existing)
               if (!isFullscreenMode)
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
                   child: Container(
                     height: 48,
                     margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -373,7 +656,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                                   } else {
                                     final targetOffset = (value / (widget.episode.images.length - 1)) *
                                         _verticalScrollController.position.maxScrollExtent;
-
                                     _verticalScrollController.jumpTo(targetOffset);
                                   }
                                 },
@@ -388,14 +670,11 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                             color: Colors.white,
                           ),
                           onPressed: () {
-                            _resetZoom(); // Reset zoom when switching modes
+                            _resetZoom();
                             setState(() {
                               isHorizontalMode = !isHorizontalMode;
                             });
-
-                            // Handle mode switch with proper position
                             if (isHorizontalMode) {
-                              // Switching to horizontal: set page based on scroll progress
                               Future.delayed(Duration.zero, () {
                                 if (_horizontalPageController.hasClients) {
                                   _horizontalPageController.jumpToPage(_currentPage);
@@ -408,7 +687,8 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                     ),
                   ),
                 ),
-              // Fullscreen top overlay (episode title, time, and battery)
+
+              // Fullscreen top overlay
               if (isFullscreenMode)
                 Positioned(
                   top: 0,
@@ -430,7 +710,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Episode title - with dark gray color
                           Container(
                             padding: EdgeInsets.symmetric(
                               horizontal: 10,
@@ -451,7 +730,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          // Time display
                           Text(
                             _currentTime,
                             style: TextStyle(
@@ -461,7 +739,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          // Battery percentage - with dark gray color and charging indicator
                           Row(
                             children: [
                               Icon(
@@ -494,11 +771,12 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
                     ),
                   ),
                 ),
-              // Exit fullscreen button when in fullscreen mode
+
+              // Exit fullscreen button
               if (isFullscreenMode)
                 Positioned(
                   left: 20,
-                  bottom: MediaQuery.of(context).padding.bottom + 20, // Add bottom padding
+                  bottom: MediaQuery.of(context).padding.bottom + 20,
                   right: 40,
                   child: GestureDetector(
                     onTap: _toggleFullscreenMode,
@@ -523,7 +801,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     );
   }
 
-  // Helper method to get appropriate battery icon based on level and charging state
   IconData _getBatteryIcon() {
     if (_isCharging) {
       return Icons.battery_charging_full;
@@ -537,7 +814,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     return Icons.battery_1_bar;
   }
 
-  // New synchronized vertical view with InteractiveViewer
   Widget _buildSynchronizedVerticalView() {
     return Stack(
       children: [
@@ -632,6 +908,58 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
     );
   }
 
+  Widget _buildGlassmorphicInteractionButton({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+    String? countText,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          // Subtle glassmorphic effect for buttons
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 0.5,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: color,
+              size: 26,
+            ),
+            // FIXED: Always show count container, even if count is 0
+            SizedBox(height: 4),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                countText ?? '0', // Show '0' if countText is null
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   Widget _buildHorizontalView() {
     return PageView.builder(
       controller: _horizontalPageController,
@@ -658,18 +986,10 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen> {
             ),
             tightMode: true,
             gaplessPlayback: true,
-            enableRotation: false, // Disable rotation if not needed
+            enableRotation: false,
             filterQuality: FilterQuality.high,
-            gestureDetectorBehavior: HitTestBehavior.opaque, // Ensure gestures are detected properly
-            basePosition: Alignment.center, // Center the image when zooming
-            scaleStateChangedCallback: (scaleState) {
-              // Optional: Add callback for scale state changes
-              print("Scale State: $scaleState");
-            },
-            onScaleEnd: (context, details, controller) {
-              // Optional: Add callback for when scaling ends
-              print("Scale Ended");
-            },
+            gestureDetectorBehavior: HitTestBehavior.opaque,
+            basePosition: Alignment.center,
           ),
         );
       },

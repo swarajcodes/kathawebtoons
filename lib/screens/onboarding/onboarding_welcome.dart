@@ -182,7 +182,7 @@ class _OnboardingWelcomeState extends State<OnboardingWelcome> {
                         SizedBox(height: 20),
                         // App logo
                         Image.asset(
-                          'assets/katha_logo.png',
+                          'assets/KathaLogo.png',
                           height: 30,
                           errorBuilder: (context, error, stackTrace) {
                             print('Error loading logo: $error');

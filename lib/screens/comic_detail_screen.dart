@@ -9,7 +9,7 @@ import '../models/episode_model.dart' as episode_model;
 import '../models/webnovel_episode.dart';
 import '../widgets/comic_header.dart';
 import '../widgets/episode_list_tile.dart';
-import 'episode_detail_screen.dart';
+import '../screens/episode_detail/episode_detail_screen.dart';
 import 'home_screen.dart';
 import '../theme/app_theme.dart';
 

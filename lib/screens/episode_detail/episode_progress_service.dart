@@ -14,6 +14,7 @@ class EpisodeProgressService {
 
   bool hasMarkedAsRead = false;
   bool isLiked = false;
+  bool _isInitialized = false;  // Add initialization flag
   List<Episode> episodes = [];
   Episode? nextEpisode;
   bool isLastEpisode = false;
@@ -25,9 +26,21 @@ class EpisodeProgressService {
   });
 
   Future<void> initialize() async {
-    await _checkReadStatus();
-    await _fetchEpisodes();
-    await _loadEpisodeInteractionData();
+    if (_isInitialized) return;  // Prevent multiple initializations
+    
+    try {
+      await _loadEpisodeInteractionData();
+
+      await Future.wait([
+        _checkReadStatus(),
+        _fetchEpisodes(),
+
+      ]);
+      _isInitialized = true;
+    } catch (e) {
+      print('Error initializing EpisodeProgressService: $e');
+      // Keep default values (false) on error
+    }
   }
 
   Future<void> _checkReadStatus() async {
@@ -82,38 +95,49 @@ class EpisodeProgressService {
 
   Future<void> _loadEpisodeInteractionData() async {
     try {
-      await _commentsService.recalculateEpisodeStats(
-        comicId: comicId,
-        episodeId: episodeId,
-      );
-
-      await _commentsService.initializeEpisodeStats(
-        comicId: comicId,
-        episodeId: episodeId,
-      );
-
+      // Check if user has liked - this should be fast
       isLiked = await _commentsService.hasUserLiked(
         comicId: comicId,
         episodeId: episodeId,
         targetId: episodeId,
       );
+
+      // Initialize stats in background (don't await)
+      _commentsService.initializeEpisodeStats(
+        comicId: comicId,
+        episodeId: episodeId,
+      ).then((_) {
+        return _commentsService.recalculateEpisodeStats(
+          comicId: comicId,
+          episodeId: episodeId,
+        );
+      }).catchError((e) {
+        print('Error initializing episode stats: $e');
+      });
     } catch (e) {
       print('Error loading episode interaction data: $e');
+      isLiked = false;
     }
   }
 
   Future<void> toggleEpisodeLike() async {
     try {
+      // Optimistically update UI
+      isLiked = !isLiked;
+
+      // Perform the actual toggle
       await _commentsService.toggleEpisodeLike(
         comicId: comicId,
         episodeId: episodeId,
       );
-      isLiked = !isLiked;
     } catch (e) {
+      // Revert on error
+      isLiked = !isLiked;
       print('Error toggling episode like: $e');
       rethrow;
     }
   }
+
 
   void dispose() {
     // Clean up if needed

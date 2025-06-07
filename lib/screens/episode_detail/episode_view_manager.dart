@@ -26,28 +26,51 @@ class EpisodeViewManager {
     horizontalPageController = PageController();
     verticalScrollController = ScrollController();
 
+    // Initialize interaction bar in hidden state
     isInteractionBarVisible = false;
 
     interactionBarController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: vsync,
-      value: 0.0,
     );
+
+    // Fix: Swap the begin and end values
     interactionBarAnimation = Tween<Offset>(
-      begin: const Offset(1.0, 0.0),
-      end: Offset.zero,
+      begin: Offset.zero, // Visible position
+      end: const Offset(1.5, 0.0), // Hidden position
     ).animate(CurvedAnimation(
       parent: interactionBarController,
-      curve: Curves.easeInOut,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     ));
+
+    // Set to 1.0 to start hidden (at the end of the tween)
+    interactionBarController.value = 1.0;
   }
 
   void toggleFullscreenMode() {
     isFullscreenMode = !isFullscreenMode;
     if (isFullscreenMode) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      // Enter fullscreen mode with system UI hidden
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.immersiveSticky,
+        overlays: [],
+      );
+      // Lock to portrait mode
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
     } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // Exit fullscreen mode
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+        overlays: SystemUiOverlay.values,
+      );
+      // Restore portrait orientation
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
     }
   }
 
@@ -59,11 +82,14 @@ class EpisodeViewManager {
   }
 
   void toggleInteractionBar() {
-    isInteractionBarVisible = !isInteractionBarVisible;
     if (isInteractionBarVisible) {
+      // Hide the bar - animate to hidden position (forward)
       interactionBarController.forward();
+      isInteractionBarVisible = false;
     } else {
+      // Show the bar - animate to visible position (reverse)
       interactionBarController.reverse();
+      isInteractionBarVisible = true;
     }
   }
 
@@ -72,6 +98,17 @@ class EpisodeViewManager {
   }
 
   void dispose() {
+    // Ensure we exit fullscreen mode when disposing
+    if (isFullscreenMode) {
+      SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.edgeToEdge,
+        overlays: SystemUiOverlay.values,
+      );
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
     horizontalPageController.dispose();
     verticalScrollController.dispose();
     interactionBarController.dispose();

@@ -67,6 +67,12 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
     viewManager.verticalScrollController.addListener(_handleVerticalScroll);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateTime(); // Update time with proper context
+  }
+
   void _handleHorizontalPageChange() {
     if (viewManager.horizontalPageController.hasClients && viewManager.isHorizontalMode) {
       final page = viewManager.horizontalPageController.page?.round() ?? 0;
@@ -108,27 +114,16 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
   }
 
   Future<void> _initBattery() async {
-    final batteryLevel = await _battery.batteryLevel;
-    setState(() {
-      _batteryLevel = batteryLevel;
-    });
-
-    _batteryStateSubscription = _battery.onBatteryStateChanged.listen((BatteryState state) {
-      setState(() {
-        _isCharging = state == BatteryState.charging;
+    try {
+      _batteryLevel = await _battery.batteryLevel;
+      _batteryStateSubscription = _battery.onBatteryStateChanged.listen((BatteryState state) {
+        setState(() {
+          _isCharging = state == BatteryState.charging;
+        });
       });
-    });
-
-    Timer.periodic(const Duration(minutes: 5), (timer) {
-      _updateBatteryLevel();
-    });
-  }
-
-  Future<void> _updateBatteryLevel() async {
-    final batteryLevel = await _battery.batteryLevel;
-    setState(() {
-      _batteryLevel = batteryLevel;
-    });
+    } catch (e) {
+      print('Error initializing battery: $e');
+    }
   }
 
   void _updateTime() {
@@ -144,17 +139,21 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
 
   @override
   void dispose() {
-    viewManager.dispose();
-    progressService.dispose();
     _timer.cancel();
     _batteryStateSubscription?.cancel();
+    viewManager.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: _darkBackground,
+      extendBody: true,
+      extendBodyBehindAppBar: true,
       appBar: viewManager.isFullscreenMode
           ? null
           : AppBar(
@@ -162,7 +161,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_sharp),
         ),
-        backgroundColor: Colors.transparent,
+        backgroundColor: _darkBackground,
         title: Text(
           widget.episode.title,
           style: TextStyle(
@@ -174,142 +173,157 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
         iconTheme: IconThemeData(color: _accentColor),
         actions: [
           IconButton(
-            icon: const Icon(Icons.fullscreen, color: Colors.white),
-            onPressed: viewManager.toggleFullscreenMode,
+            icon: Icon(
+              viewManager.isFullscreenMode ? Icons.fullscreen_exit : Icons.fullscreen,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                viewManager.toggleFullscreenMode();
+              });
+            },
           ),
         ],
       ),
-      body: SafeArea(
-        bottom: false,
-        child: GestureDetector(
-          onTap: () {
-            if (!viewManager.isFullscreenMode) {
-              viewManager.toggleFullscreenMode();
-            }
-          },
-          child: Stack(
-            children: [
-              viewManager.isHorizontalMode
-                  ? HorizontalEpisodeView(
-                controller: viewManager.horizontalPageController,
-                episode: widget.episode,
-                onPageChanged: (page) {
-                  setState(() {
-                    viewManager.currentPage = page;
-                  });
-                },
-              )
-                  : VerticalEpisodeView(
-                controller: viewManager.verticalScrollController,
-                episode: widget.episode,
-                nextEpisode: progressService.nextEpisode,
-                isLastEpisode: progressService.isLastEpisode,
-                currentPage: viewManager.currentPage,
-                onNextEpisodePressed: () {
-                  if (progressService.nextEpisode != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => EpisodeDetailScreen(
-                          comic: widget.comic,
-                          episode: progressService.nextEpisode!,
-                        ),
-                      ),
-                    );
-                  }
-                },
-              ),
-
-              if (!viewManager.isFullscreenMode)
-                EpisodeInteractionBar(
-                  comicId: widget.comic.id,
-                  episodeId: widget.episode.id,
-                  isVisible: viewManager.isInteractionBarVisible,
-                  onToggle: viewManager.toggleInteractionBar,
-                  animation: viewManager.interactionBarAnimation,
-                  isLiked: progressService.isLiked,
-                  onToggleLike: progressService.toggleEpisodeLike,
-                  showComments: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      barrierColor: Colors.black.withOpacity(0.2),
-                      builder: (context) => CommentsBottomSheet(
-                        comicId: widget.comic.id,
-                        episodeId: widget.episode.id,
-                      ),
-                    );
-                  },
-                ),
-
-              if (!viewManager.isFullscreenMode)
-                EpisodeControlBar(
-                  isHorizontalMode: viewManager.isHorizontalMode,
-                  currentPage: viewManager.currentPage,
-                  totalPages: widget.episode.images.length,
-                  scrollProgress: viewManager.scrollProgress,
-                  onViewModeToggle: () {
-                    viewManager.resetZoom();
-                    setState(() {
-                      viewManager.isHorizontalMode = !viewManager.isHorizontalMode;
-                    });
-                    if (viewManager.isHorizontalMode) {
-                      Future.delayed(Duration.zero, () {
-                        if (viewManager.horizontalPageController.hasClients) {
-                          viewManager.horizontalPageController.jumpToPage(viewManager.currentPage);
-                        }
-                      });
-                    }
-                  },
-                  onPageChanged: (value) {
-                    if (viewManager.isHorizontalMode) {
-                      final page = value.toInt();
+      body: Stack(
+        children: [
+          // Main content
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: () {
+                // Toggle fullscreen mode on any tap
+                setState(() {
+                  viewManager.toggleFullscreenMode();
+                });
+              },
+              child: Stack(
+                children: [
+                  viewManager.isHorizontalMode
+                      ? HorizontalEpisodeView(
+                    controller: viewManager.horizontalPageController,
+                    episode: widget.episode,
+                    onPageChanged: (page) {
                       setState(() {
                         viewManager.currentPage = page;
                       });
-                      viewManager.horizontalPageController.jumpToPage(page);
-                    } else {
-                      final targetOffset = (value / (widget.episode.images.length - 1)) *
-                          viewManager.verticalScrollController.position.maxScrollExtent;
-                      viewManager.verticalScrollController.jumpTo(targetOffset);
-                    }
-                  },
-                ),
+                    },
+                  )
+                      : VerticalEpisodeView(
+                    controller: viewManager.verticalScrollController,
+                    episode: widget.episode,
+                    nextEpisode: progressService.nextEpisode,
+                    isLastEpisode: progressService.isLastEpisode,
+                    currentPage: viewManager.currentPage,
+                    onNextEpisodePressed: () {
+                      if (progressService.nextEpisode != null) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EpisodeDetailScreen(
+                              comic: widget.comic,
+                              episode: progressService.nextEpisode!,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
 
-              if (viewManager.isFullscreenMode)
-                EpisodeFullscreenOverlay(
+                  if (!viewManager.isFullscreenMode)
+                    EpisodeInteractionBar(
+                      comicId: widget.comic.id,
+                      episodeId: widget.episode.id,
+                      isVisible: viewManager.isInteractionBarVisible,
+                      onToggle: () {
+                        setState(() {
+                          viewManager.toggleInteractionBar();
+                        });
+                      },
+                      animation: viewManager.interactionBarAnimation,
+                      isLiked: progressService.isLiked,
+                      onToggleLike: progressService.toggleEpisodeLike,
+                      showComments: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          barrierColor: Colors.black.withOpacity(0.2),
+                          builder: (context) => CommentsBottomSheet(
+                            comicId: widget.comic.id,
+                            episodeId: widget.episode.id,
+                          ),
+                        );
+                      },
+                    ),
+
+                  if (!viewManager.isFullscreenMode)
+                    EpisodeControlBar(
+                      isHorizontalMode: viewManager.isHorizontalMode,
+                      currentPage: viewManager.currentPage,
+                      totalPages: widget.episode.images.length,
+                      scrollProgress: viewManager.scrollProgress,
+                      onViewModeToggle: () {
+                        viewManager.resetZoom();
+                        setState(() {
+                          viewManager.isHorizontalMode = !viewManager.isHorizontalMode;
+                        });
+                        if (viewManager.isHorizontalMode) {
+                          Future.delayed(Duration.zero, () {
+                            if (viewManager.horizontalPageController.hasClients) {
+                              viewManager.horizontalPageController.jumpToPage(viewManager.currentPage);
+                            }
+                          });
+                        }
+                      },
+                      onPageChanged: (value) {
+                        if (viewManager.isHorizontalMode) {
+                          final page = value.toInt();
+                          setState(() {
+                            viewManager.currentPage = page;
+                          });
+                          viewManager.horizontalPageController.jumpToPage(page);
+                        } else {
+                          final targetOffset = (value / (widget.episode.images.length - 1)) *
+                              viewManager.verticalScrollController.position.maxScrollExtent;
+                          viewManager.verticalScrollController.jumpTo(targetOffset);
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+
+          // Fullscreen overlay
+          if (viewManager.isFullscreenMode)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: EdgeInsets.only(top: topPadding + 4),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.8),
+                      Colors.black.withOpacity(0.4),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+                child: EpisodeFullscreenOverlay(
                   title: widget.episode.title,
                   currentTime: _currentTime,
                   batteryLevel: _batteryLevel,
                   isCharging: _isCharging,
                   batteryIcon: _getBatteryIcon(),
                 ),
-
-              if (viewManager.isFullscreenMode)
-                Positioned(
-                  left: 20,
-                  bottom: MediaQuery.of(context).padding.bottom + 20,
-                  right: 40,
-                  child: GestureDetector(
-                    onTap: viewManager.toggleFullscreenMode,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.fullscreen_exit,
-                        color: _accentColor,
-                        size: 40,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }

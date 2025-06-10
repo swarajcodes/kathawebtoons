@@ -7,6 +7,25 @@ import '../models/comic_model.dart';
 import '../models/webnovel_episode.dart';
 import '../services/reading_progress_service.dart';
 
+class SecureScreenHandler {
+  static const MethodChannel _channel = MethodChannel('secure_screen_channel');
+
+  static Future<void> enableSecureScreen() async {
+    try {
+      await _channel.invokeMethod('enableSecureScreen');
+    } on PlatformException catch (e) {
+      print("Failed to enable secure screen: ${e.message}");
+    }
+  }
+
+  static Future<void> disableSecureScreen() async {
+    try {
+      await _channel.invokeMethod('disableSecureScreen');
+    } on PlatformException catch (e) {
+      print("Failed to disable secure screen: ${e.message}");
+    }
+  }
+}
 
 class WebnovelEpisodeScreen extends StatefulWidget {
   final Comic comic;
@@ -27,7 +46,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   List<String> _paragraphs = [];
   bool _isLoading = true;
   double _fontSize = 16.0;
-  bool _isDarkMode = true;
   ScrollController _scrollController = ScrollController();
   double _readProgress = 0.0;
   bool _isTranslating = false;
@@ -41,9 +59,8 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   final ReadingProgressService _progressService = ReadingProgressService();
   bool _hasMarkedAsRead = false;
 
-  // Update your _supportedLanguages map to include Indian languages:
   final Map<String, String> _supportedLanguages = {
-    'Original': 'English',  // Keep original first
+    'Original': 'English',
     'bn': 'Bengali',
     'gu': 'Gujarati',
     'hi': 'Hindi',
@@ -54,7 +71,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     'te': 'Telugu',
   };
 
-  // Theme colors
   final Color _darkBackground = Color(0xFF000000);
   final Color _darkText = Color(0xFFE0E0E0);
   final Color _accentColor = Color(0xFFA3D749);
@@ -67,8 +83,8 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     _translatedTitle = widget.episode.title;
     _loadDocxContent();
     _scrollController.addListener(_updateReadProgress);
+    SecureScreenHandler.enableSecureScreen(); // Enable screenshot protection
 
-    // Add scroll listener to track reading progress
     _scrollController.addListener(() {
       if (_scrollController.hasClients) {
         double offset = _scrollController.offset;
@@ -77,7 +93,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
         if (totalHeight > 0) {
           double progress = (offset / totalHeight).clamp(0.0, 1.0);
 
-          // Mark as read when scrolling to 80% or more
           if (progress > 0.8 && !_hasMarkedAsRead) {
             _markAsRead(percentage: progress);
           }
@@ -86,17 +101,12 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     });
   }
 
-  Future<void> _checkReadStatus() async {
-    final isRead = await _progressService.isEpisodeRead(
-      widget.comic.id,
-      widget.episode.id,
-    );
-
-    if (mounted) {
-      setState(() {
-        _hasMarkedAsRead = isRead;
-      });
-    }
+  @override
+  void dispose() {
+    _scrollController.removeListener(_updateReadProgress);
+    _scrollController.dispose();
+    SecureScreenHandler.disableSecureScreen(); // Disable screenshot protection
+    super.dispose();
   }
 
   Future<void> _markAsRead({double percentage = 1.0}) async {
@@ -108,17 +118,11 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
       percentage: percentage,
     );
 
-    setState(() {
-      _hasMarkedAsRead = true;
-    });
-  }
-
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_updateReadProgress);
-    _scrollController.dispose();
-    super.dispose();
+    if (mounted) {
+      setState(() {
+        _hasMarkedAsRead = true;
+      });
+    }
   }
 
   void _updateReadProgress() {
@@ -131,64 +135,62 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
 
   Future<void> _loadDocxContent() async {
     try {
-      // Download the .docx file
       final response = await http.get(Uri.parse(widget.episode.docxUrl));
       if (response.statusCode == 200) {
-        // Decode the .docx file (which is a ZIP archive)
         final archive = ZipDecoder().decodeBytes(response.bodyBytes);
-
-        // Find the document.xml file in the archive
         final documentXml = archive.findFile('word/document.xml');
+
         if (documentXml != null) {
-          // Extract text from the XML content
           final xmlContent = String.fromCharCodes(documentXml.content);
-
           final extractedText = _extractTextFromXml(xmlContent);
-
-          // Split into paragraphs
           final paragraphs = extractedText.split('\n\n')
               .where((p) => p.trim().isNotEmpty)
               .toList();
 
-          setState(() {
-            _content = extractedText;
-            _paragraphs = paragraphs;
-            _isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              _content = extractedText;
+              _paragraphs = paragraphs;
+              _isLoading = false;
+            });
+          }
         } else {
+          if (mounted) {
+            setState(() {
+              _content = "Error: Could not find document.xml in the .docx file.";
+              _isLoading = false;
+            });
+          }
+        }
+      } else {
+        if (mounted) {
           setState(() {
-            _content = "Error: Could not find document.xml in the .docx file.";
+            _content = "Error: Failed to download .docx file.";
             _isLoading = false;
           });
         }
-      } else {
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _content = "Error: Failed to download .docx file.";
+          _content = "Error: $e";
           _isLoading = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _content = "Error: $e";
-        _isLoading = false;
-      });
     }
   }
 
   String _extractTextFromXml(String xmlContent) {
     final textBuffer = StringBuffer();
-
-    // Pattern for paragraph breaks
     final paragraphRegex = RegExp(r'<w:p[^>]*>.*?</w:p>', dotAll: true);
     final paragraphs = paragraphRegex.allMatches(xmlContent);
 
     for (final paragraph in paragraphs) {
       final paragraphText = _extractTextFromParagraph(paragraph.group(0) ?? '');
       if (paragraphText.trim().isNotEmpty) {
-        // Clean the text before adding it to the buffer
-        final cleanedText = cleanText(paragraphText);
+        final cleanedText = paragraphText.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
         textBuffer.writeln(cleanedText);
-        textBuffer.writeln(); // Add blank line between paragraphs
+        textBuffer.writeln();
       }
     }
 
@@ -203,22 +205,12 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
     for (final match in matches) {
       final text = match.group(1)?.trim() ?? '';
       if (text.isNotEmpty) {
-        textBuffer.write(normalizeText(text)); // Normalize text
-        textBuffer.write(' '); // Add space between text segments
+        textBuffer.write(text.replaceAll(RegExp(r'[^\x20-\x7E]'), ''));
+        textBuffer.write(' ');
       }
     }
 
     return textBuffer.toString().trim();
-  }
-
-  String cleanText(String text) {
-    // Remove any non-printable characters
-    return text.replaceAll(RegExp(r'[\x00-\x1F\x7F]'), '');
-  }
-
-  String normalizeText(String text) {
-    // Keep only ASCII printable characters
-    return text.replaceAll(RegExp(r'[^\x20-\x7E]'), '');
   }
 
   Future<void> _showLanguageDialog() async {
@@ -268,7 +260,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
   Future<void> _translateContent({required String targetLanguage}) async {
     if (_isTranslating || targetLanguage == 'Original') {
       if (targetLanguage == 'Original' && _isTranslated) {
-        // Revert to original text
         setState(() {
           _paragraphs = List.from(_originalParagraphs);
           _isTranslated = false;
@@ -287,57 +278,42 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
         _originalTitle,
         to: targetLanguage,
       );
-      setState(() {
-        _translatedTitle = translateTitle.toString();
-      });
 
-      if(!_isTranslated)
-      {
+      if (!_isTranslated) {
         _originalParagraphs = List.from(_paragraphs);
-
-        // Translate all content at once for better performance
-        final fullText = _paragraphs.join('\n\n');
-        final translation = await translator.translate(
-          fullText,
-          to: targetLanguage,
-        );
-
-        setState(() {
-          _paragraphs = translation.text.split('\n\n');
-          _isTranslated = true;
-          _currentLanguage = targetLanguage;
-        });
       }
-      else{
 
-        // Translate all content at once for better performance
-        final fullText = _originalParagraphs.join('\n\n');
-        final translation = await translator.translate(
-          fullText,
-          to: targetLanguage,
-        );
+      final fullText = _originalParagraphs.join('\n\n');
+      final translation = await translator.translate(
+        fullText,
+        to: targetLanguage,
+      );
 
+      if (mounted) {
         setState(() {
+          _translatedTitle = translateTitle.toString();
           _paragraphs = translation.text.split('\n\n');
           _isTranslated = true;
           _currentLanguage = targetLanguage;
-          print(_currentLanguage);
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Translation failed: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Translation failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() {
-        _isTranslating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isTranslating = false;
+        });
+      }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -428,7 +404,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Episode title and number
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 10,
@@ -448,7 +423,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
                         ),
                       ),
                       SizedBox(height: 20),
-                      // Chapter title
                       Text(
                         _currentLanguage != 'Original' ? _translatedTitle : _originalTitle,
                         style: TextStyle(
@@ -460,7 +434,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
                         ),
                       ),
                       SizedBox(height: 30),
-                      // Content
                       ..._paragraphs.map((paragraph) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 20.0),
@@ -482,7 +455,6 @@ class _WebnovelEpisodeScreenState extends State<WebnovelEpisodeScreen> {
                 ),
               ),
             ),
-            // Bottom progress bar
             Container(
               height: 3,
               child: LinearProgressIndicator(

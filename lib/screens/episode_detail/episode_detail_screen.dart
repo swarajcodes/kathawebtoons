@@ -1,7 +1,7 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter/services.dart';
 import '../../models/comic_model.dart' as comic_model;
 import '../../models/episode_model.dart';
 import '../../widgets/comments_bottom_sheet.dart';
@@ -19,6 +19,26 @@ final Color _darkText = Color(0xFFE0E0E0);
 final Color _accentColor = Color(0xFFA3D749);
 final Color _secondaryColor = Color(0xFF505050);
 final String _fontFamily = 'Plus Jakarta Sans';
+
+class SecureScreenHandler {
+  static const MethodChannel _channel = MethodChannel('secure_screen_channel');
+
+  static Future<void> enableSecureScreen() async {
+    try {
+      await _channel.invokeMethod('enableSecureScreen');
+    } on PlatformException catch (e) {
+      print("Failed to enable secure screen: ${e.message}");
+    }
+  }
+
+  static Future<void> disableSecureScreen() async {
+    try {
+      await _channel.invokeMethod('disableSecureScreen');
+    } on PlatformException catch (e) {
+      print("Failed to disable secure screen: ${e.message}");
+    }
+  }
+}
 
 class EpisodeDetailScreen extends StatefulWidget {
   final comic_model.Comic comic;
@@ -61,6 +81,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
     _updateTime();
     _timer = Timer.periodic(const Duration(minutes: 1), (t) => _updateTime());
     progressService.initialize();
+    SecureScreenHandler.enableSecureScreen(); // Enable screenshot protection
 
     // Setup listeners
     viewManager.horizontalPageController.addListener(_handleHorizontalPageChange);
@@ -70,7 +91,16 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _updateTime(); // Update time with proper context
+    _updateTime();
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    _batteryStateSubscription?.cancel();
+    viewManager.dispose();
+    SecureScreenHandler.disableSecureScreen(); // Disable screenshot protection
+    super.dispose();
   }
 
   void _handleHorizontalPageChange() {
@@ -137,18 +167,21 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
     return time.toString().padLeft(2, '0');
   }
 
-  @override
-  void dispose() {
-    _timer.cancel();
-    _batteryStateSubscription?.cancel();
-    viewManager.dispose();
-    super.dispose();
+  IconData _getBatteryIcon() {
+    if (_isCharging) {
+      return Icons.battery_charging_full;
+    }
+    if (_batteryLevel >= 95) return Icons.battery_full;
+    if (_batteryLevel >= 75) return Icons.battery_6_bar;
+    if (_batteryLevel >= 50) return Icons.battery_4_bar;
+    if (_batteryLevel >= 25) return Icons.battery_3_bar;
+    if (_batteryLevel >= 10) return Icons.battery_2_bar;
+    return Icons.battery_1_bar;
   }
 
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
       backgroundColor: _darkBackground,
@@ -187,11 +220,9 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
       ),
       body: Stack(
         children: [
-          // Main content
           Positioned.fill(
             child: GestureDetector(
               onTap: () {
-                // Toggle fullscreen mode on any tap
                 setState(() {
                   viewManager.toggleFullscreenMode();
                 });
@@ -294,7 +325,6 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
             ),
           ),
 
-          // Fullscreen overlay
           if (viewManager.isFullscreenMode)
             Positioned(
               top: 0,
@@ -326,17 +356,5 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
         ],
       ),
     );
-  }
-
-  IconData _getBatteryIcon() {
-    if (_isCharging) {
-      return Icons.battery_charging_full;
-    }
-    if (_batteryLevel >= 95) return Icons.battery_full;
-    if (_batteryLevel >= 75) return Icons.battery_6_bar;
-    if (_batteryLevel >= 50) return Icons.battery_4_bar;
-    if (_batteryLevel >= 25) return Icons.battery_3_bar;
-    if (_batteryLevel >= 10) return Icons.battery_2_bar;
-    return Icons.battery_1_bar;
   }
 }

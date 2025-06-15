@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:photo_view/photo_view.dart';
 import '../../../models/episode_model.dart';
+import '../episode_view_manager.dart';
+import 'zoomable_image.dart';
 
 class VerticalEpisodeView extends StatefulWidget {
   final ScrollController controller;
@@ -10,6 +10,7 @@ class VerticalEpisodeView extends StatefulWidget {
   final bool isLastEpisode;
   final int currentPage;
   final VoidCallback onNextEpisodePressed;
+  final EpisodeViewManager viewManager;
 
   const VerticalEpisodeView({
     Key? key,
@@ -19,15 +20,19 @@ class VerticalEpisodeView extends StatefulWidget {
     required this.isLastEpisode,
     required this.currentPage,
     required this.onNextEpisodePressed,
+    required this.viewManager,
   }) : super(key: key);
 
   @override
-  _VerticalEpisodeViewState createState() => _VerticalEpisodeViewState();
+  State<VerticalEpisodeView> createState() => _VerticalEpisodeViewState();
 }
 
 class _VerticalEpisodeViewState extends State<VerticalEpisodeView> {
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Stack(
       children: [
         ListView.builder(
@@ -36,34 +41,21 @@ class _VerticalEpisodeViewState extends State<VerticalEpisodeView> {
           itemBuilder: (context, index) {
             if (index == widget.episode.images.length) {
               return SizedBox(
-                height: MediaQuery.of(context).size.height * 0.3,
-                width: MediaQuery.of(context).size.width,
+                height: screenHeight * 0.3,
+                width: screenWidth,
               );
             }
-            return SizedBox(
-              height: MediaQuery.of(context).size.height * 0.6,
-              width: MediaQuery.of(context).size.width,
-              child: Hero(
-                tag: "page_${widget.episode.id}_$index",
-                child: PhotoView(
-                  imageProvider: CachedNetworkImageProvider(widget.episode.images[index]),
-                  minScale: PhotoViewComputedScale.contained,
-                  maxScale: PhotoViewComputedScale.covered * 4,
-                  initialScale: PhotoViewComputedScale.contained,
-                  backgroundDecoration: const BoxDecoration(color: Colors.black),
-                  loadingBuilder: (context, event) => Container(
-                    color: Colors.grey.shade900,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: Colors.lightGreenAccent,
-                      ),
-                    ),
-                  ),
-                  tightMode: true,
-                  gaplessPlayback: true,
-                  enableRotation: false,
-                  filterQuality: FilterQuality.high,
-                  gestureDetectorBehavior: HitTestBehavior.opaque,
+
+            return Container(
+              // Remove fixed height to let image determine its size
+              width: screenWidth,
+              margin: const EdgeInsets.symmetric(vertical: 2),
+              child: AspectRatio(
+                aspectRatio: 3/4, // Typical comic page ratio, adjust as needed
+                child: ZoomableImage(
+                  imageUrl: widget.episode.images[index],
+                  transformationController: widget.viewManager.getTransformationController(index),
+                  heroTag: "page_${widget.episode.id}_$index",
                 ),
               ),
             );
@@ -85,9 +77,9 @@ class _VerticalEpisodeViewState extends State<VerticalEpisodeView> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Text(
                       'Next Chapter',
                       style: TextStyle(

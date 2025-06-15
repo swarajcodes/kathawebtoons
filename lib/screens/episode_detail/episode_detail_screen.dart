@@ -238,6 +238,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                         viewManager.currentPage = page;
                       });
                     },
+                    viewManager: viewManager, // Add this line
                   )
                       : VerticalEpisodeView(
                     controller: viewManager.verticalScrollController,
@@ -258,6 +259,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                         );
                       }
                     },
+                    viewManager: viewManager,
                   ),
 
                   if (!viewManager.isFullscreenMode)
@@ -294,6 +296,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                       totalPages: widget.episode.images.length,
                       scrollProgress: viewManager.scrollProgress,
                       onViewModeToggle: () {
+                        // Reset zoom to ensure a consistent state when switching view modes.
                         viewManager.resetZoom();
                         setState(() {
                           viewManager.isHorizontalMode = !viewManager.isHorizontalMode;

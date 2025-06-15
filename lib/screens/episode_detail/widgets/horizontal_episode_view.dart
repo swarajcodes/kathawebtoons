@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:photo_view/photo_view.dart';
 import '../../../models/episode_model.dart';
+import '../episode_view_manager.dart';
+import 'zoomable_image.dart';
 
 class HorizontalEpisodeView extends StatelessWidget {
   final PageController controller;
   final Episode episode;
   final Function(int)? onPageChanged;
+  final EpisodeViewManager viewManager;
 
   const HorizontalEpisodeView({
     Key? key,
     required this.controller,
     required this.episode,
     this.onPageChanged,
+    required this.viewManager,
   }) : super(key: key);
 
   @override
@@ -20,33 +22,22 @@ class HorizontalEpisodeView extends StatelessWidget {
     return PageView.builder(
       controller: controller,
       itemCount: episode.images.length,
-      onPageChanged: onPageChanged,
+      onPageChanged: (index) {
+        // Reset zoom when changing pages
+        viewManager.resetZoom(specificIndex: viewManager.currentPage);
+        onPageChanged?.call(index);
+      },
       physics: const BouncingScrollPhysics(),
       pageSnapping: true,
       scrollDirection: Axis.horizontal,
       itemBuilder: (context, index) {
-        return Hero(
-          tag: "page_${episode.id}_$index",
-          child: PhotoView(
-            imageProvider: CachedNetworkImageProvider(episode.images[index]),
-            minScale: PhotoViewComputedScale.covered * 0.8,
-            maxScale: PhotoViewComputedScale.covered * 4,
-            initialScale: PhotoViewComputedScale.contained,
-            backgroundDecoration: const BoxDecoration(color: Colors.black),
-            loadingBuilder: (context, event) => Container(
-              color: Colors.grey.shade900,
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.lightGreenAccent,
-                ),
-              ),
-            ),
-            tightMode: true,
-            gaplessPlayback: true,
-            enableRotation: false,
-            filterQuality: FilterQuality.high,
-            gestureDetectorBehavior: HitTestBehavior.opaque,
-            basePosition: Alignment.center,
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          child: ZoomableImage(
+            imageUrl: episode.images[index],
+            transformationController: viewManager.getTransformationController(index),
+            heroTag: "page_${episode.id}_$index",
           ),
         );
       },

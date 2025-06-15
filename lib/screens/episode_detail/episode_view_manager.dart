@@ -17,8 +17,8 @@ class EpisodeViewManager {
   late AnimationController interactionBarController;
   late Animation<Offset> interactionBarAnimation;
 
-  // Individual zoom controllers for each image
-  final Map<int, TransformationController> _transformationControllers = {};
+  // Single transformation controller for the entire document
+  late TransformationController documentTransformationController;
 
   EpisodeViewManager({
     required this.episode,
@@ -27,10 +27,8 @@ class EpisodeViewManager {
     horizontalPageController = PageController();
     verticalScrollController = ScrollController();
 
-    // Initialize transformation controllers for each image
-    for (int i = 0; i < episode.images.length; i++) {
-      _transformationControllers[i] = TransformationController();
-    }
+    // Initialize single document-level transformation controller
+    documentTransformationController = TransformationController();
 
     isInteractionBarVisible = false;
 
@@ -51,23 +49,8 @@ class EpisodeViewManager {
     interactionBarController.value = 1.0;
   }
 
-  TransformationController getTransformationController(int index) {
-    return _transformationControllers[index] ?? TransformationController();
-  }
-
-  void resetZoom({int? specificIndex}) {
-    if (specificIndex != null) {
-      _transformationControllers[specificIndex]?.value = Matrix4.identity();
-    } else {
-      // Reset all controllers
-      for (var controller in _transformationControllers.values) {
-        controller.value = Matrix4.identity();
-      }
-    }
-  }
-
-  void resetCurrentPageZoom() {
-    resetZoom(specificIndex: currentPage);
+  void resetDocumentZoom() {
+    documentTransformationController.value = Matrix4.identity();
   }
 
   void toggleFullscreenMode() {
@@ -123,11 +106,6 @@ class EpisodeViewManager {
     horizontalPageController.dispose();
     verticalScrollController.dispose();
     interactionBarController.dispose();
-
-    // Dispose all transformation controllers
-    for (var controller in _transformationControllers.values) {
-      controller.dispose();
-    }
-    _transformationControllers.clear();
+    documentTransformationController.dispose();
   }
 }

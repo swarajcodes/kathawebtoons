@@ -297,7 +297,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                       scrollProgress: viewManager.scrollProgress,
                       onViewModeToggle: () {
                         // Reset zoom to ensure a consistent state when switching view modes.
-                        viewManager.resetZoom();
+                        //viewManager.resetZoom();
                         setState(() {
                           viewManager.isHorizontalMode = !viewManager.isHorizontalMode;
                         });

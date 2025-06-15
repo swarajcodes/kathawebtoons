@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/episode_model.dart';
 import '../episode_view_manager.dart';
-import 'zoomable_image.dart';
+import 'document_viewer.dart';
 
 class VerticalEpisodeView extends StatefulWidget {
   final ScrollController controller;
@@ -30,36 +30,13 @@ class VerticalEpisodeView extends StatefulWidget {
 class _VerticalEpisodeViewState extends State<VerticalEpisodeView> {
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
-
     return Stack(
       children: [
-        ListView.builder(
-          controller: widget.controller,
-          itemCount: widget.episode.images.length + 1,
-          itemBuilder: (context, index) {
-            if (index == widget.episode.images.length) {
-              return SizedBox(
-                height: screenHeight * 0.3,
-                width: screenWidth,
-              );
-            }
-
-            return Container(
-              // Remove fixed height to let image determine its size
-              width: screenWidth,
-              margin: const EdgeInsets.symmetric(vertical: 2),
-              child: AspectRatio(
-                aspectRatio: 3/4, // Typical comic page ratio, adjust as needed
-                child: ZoomableImage(
-                  imageUrl: widget.episode.images[index],
-                  transformationController: widget.viewManager.getTransformationController(index),
-                  heroTag: "page_${widget.episode.id}_$index",
-                ),
-              ),
-            );
-          },
+        DocumentViewer(
+          imageUrls: widget.episode.images,
+          transformationController: widget.viewManager.documentTransformationController,
+          scrollController: widget.controller,
+          heroTagPrefix: "page_${widget.episode.id}",
         ),
         if (widget.nextEpisode != null && !widget.isLastEpisode && widget.currentPage == widget.episode.images.length - 1)
           Positioned(
@@ -87,6 +64,7 @@ class _VerticalEpisodeViewState extends State<VerticalEpisodeView> {
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Plus Jakarta Sans',
+
                       ),
                     ),
                     SizedBox(width: 8),

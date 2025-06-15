@@ -23,8 +23,7 @@ class HorizontalEpisodeView extends StatelessWidget {
       controller: controller,
       itemCount: episode.images.length,
       onPageChanged: (index) {
-        // Reset zoom when changing pages
-        viewManager.resetZoom(specificIndex: viewManager.currentPage);
+        // Don't reset zoom in horizontal mode - maintain document-level zoom
         onPageChanged?.call(index);
       },
       physics: const BouncingScrollPhysics(),
@@ -36,7 +35,7 @@ class HorizontalEpisodeView extends StatelessWidget {
           height: double.infinity,
           child: ZoomableImage(
             imageUrl: episode.images[index],
-            transformationController: viewManager.getTransformationController(index),
+            transformationController: viewManager.documentTransformationController,
             heroTag: "page_${episode.id}_$index",
           ),
         );

@@ -6,15 +6,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:kathawebtoons/services/user_profile_service.dart';
 import 'package:kathawebtoons/models/user_profile.dart';
-import 'package:kathawebtoons/screens/reading_progress_screen.dart';
-import '../models/reading_progress_model.dart';
 import '../services/auth_service.dart';
 import 'login_screen.dart';
 import 'package:kathawebtoons/services/reading_progress_service.dart';
 import '../models/comic_model.dart';
 import '../screens/comic_detail_screen.dart';
 import '../screens/edit_profile_screen.dart';
-import 'package:flutter/rendering.dart';
 import 'package:shimmer/shimmer.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -30,7 +27,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final picker = ImagePicker();
   final AuthService _authService = AuthService();
   final UserProfileService _userProfileService = UserProfileService();
-  final ReadingProgressService _progressService = ReadingProgressService();
+  final GlobalKey<_ProfileStoriesSectionState> _readingListKey = GlobalKey<_ProfileStoriesSectionState>();
 
   Future<void> _pickImage() async {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -330,16 +327,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         profile.username,
                                         style: TextStyle(
                                           color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 0.5,
+                                          fontFamily: 'Mary Poppins',
                                         ),
                                       ),
-                                      SizedBox(height: 2),
+                                      SizedBox(height: 4),
                                       Text(
                                         '@${profile.handle}',
                                         style: TextStyle(
-                                          color: Colors.grey[400],
+                                          color: Color(0xFFA3D749),
                                           fontSize: 14,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -434,20 +434,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                               ],
                             ),
-                            SizedBox(height: 8),
+                            SizedBox(height: 12),
                             // Bio section
                             Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.verified, color: Colors.yellow[700], size: 14),
-                                SizedBox(width: 4),
+                                // Icon(
+                                //   Icons.info_outline,
+                                //   color: Colors.grey[500],
+                                //   size: 16,
+                                // ),
+                                // SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     profile.bio.isNotEmpty ? profile.bio : 'No bio added',
                                     style: TextStyle(
-                                      color: Colors.grey[300],
-                                      fontSize: 13,
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      height: 1.4,
+                                      fontStyle: profile.bio.isEmpty ? FontStyle.italic : FontStyle.normal,
                                     ),
-                                    maxLines: 2,
+                                    maxLines: 3,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -477,7 +484,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       SizedBox(height: 16),
                       Divider(color: Colors.grey[900]),
                       // Reading List Section
-                      _ProfileStoriesSection(userId: profile.uid, isOwnProfile: isOwnProfile),
+                      RefreshIndicator(
+                        onRefresh: () async {
+                          // Trigger refresh of the reading list
+                          await _readingListKey.currentState?._refreshReadingList();
+                        },
+                        color: Color(0xFFA3D749),
+                        backgroundColor: Colors.black,
+                        child: _ProfileStoriesSection(
+                          key: _readingListKey,
+                          userId: profile.uid, 
+                          isOwnProfile: isOwnProfile,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -579,7 +598,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _ProfileStoriesSection extends StatefulWidget {
   final String userId;
   final bool isOwnProfile;
-  const _ProfileStoriesSection({required this.userId, required this.isOwnProfile});
+  const _ProfileStoriesSection({
+    super.key,
+    required this.userId, 
+    required this.isOwnProfile,
+  });
 
   @override
   State<_ProfileStoriesSection> createState() => _ProfileStoriesSectionState();
@@ -588,19 +611,45 @@ class _ProfileStoriesSection extends StatefulWidget {
 class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ReadingProgressService _progressService = ReadingProgressService();
-  bool _isLoading = true;
-  List<Map<String, dynamic>> _inProgressComics = [];
+  
+  // Cache for reading list data
+  List<Map<String, dynamic>>? _cachedReadingList;
+  DateTime? _lastCacheTime;
+  static const Duration _cacheDuration = Duration(minutes: 5); // Cache for 5 minutes
 
   @override
   void initState() {
     super.initState();
-    _loadReadingProgress();
   }
 
-  Future<void> _loadReadingProgress() async {
-    setState(() {
-      _isLoading = true;
-    });
+  bool _isCacheValid() {
+    if (_cachedReadingList == null || _lastCacheTime == null) return false;
+    return DateTime.now().difference(_lastCacheTime!) < _cacheDuration;
+  }
+
+  Stream<List<Map<String, dynamic>>> _getReadingProgressStream() {
+    return _firestore
+        .collection('users')
+        .doc(widget.userId)
+        .collection('readingProgress')
+        .snapshots()
+        .asyncMap((snapshot) async {
+          // Check if cache is still valid
+          if (_isCacheValid()) {
+            return _cachedReadingList!;
+          }
+          
+          // Load fresh data
+          return await _loadReadingProgress();
+        });
+  }
+
+  Future<List<Map<String, dynamic>>> _loadReadingProgress() async {
+    // Return cached data if it's still valid
+    if (_isCacheValid()) {
+      return _cachedReadingList!;
+    }
+
     try {
       // Get all reading progress documents for the user
       final progressSnapshot = await _firestore
@@ -627,44 +676,18 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
       // Fetch comic details for each comic with progress
       final List<Map<String, dynamic>> inProgressComics = [];
 
+      // Use Future.wait to load comics in parallel for better performance
+      final List<Future<Map<String, dynamic>?>> comicFutures = [];
+
       for (final comicId in progressByComic.keys) {
-        try {
-          final comicDoc = await _firestore
-              .collection('comics')
-              .doc(comicId)
-              .get();
+        comicFutures.add(_loadComicWithProgress(comicId, progressByComic[comicId]!));
+      }
 
-          if (comicDoc.exists) {
-            final comic = Comic.fromFirestore(comicDoc);
-            // Load episodes from subcollection
-            await comic.loadEpisodes();
-            
-            // Use ReadingProgressService to calculate progress
-            final progress = await _progressService.getComicProgress(
-              comicId,
-              comic.episodes.length,
-            );
-
-            // Find latest read timestamp
-            DateTime latestTimestamp = DateTime(2000);
-            for (final doc in progressByComic[comicId]!) {
-              final data = doc.data() as Map<String, dynamic>;
-              if (data.containsKey('completedAt')) {
-                final timestamp = (data['completedAt'] as Timestamp).toDate();
-                if (timestamp.isAfter(latestTimestamp)) {
-                  latestTimestamp = timestamp;
-                }
-              }
-            }
-
-            inProgressComics.add({
-              'comic': comic,
-              'progress': progress,
-              'lastReadAt': latestTimestamp,
-            });
-          }
-        } catch (e) {
-          print('Error fetching comic $comicId: $e');
+      final results = await Future.wait(comicFutures);
+      
+      for (final result in results) {
+        if (result != null) {
+          inProgressComics.add(result);
         }
       }
 
@@ -672,16 +695,66 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
       inProgressComics.sort((a, b) =>
           (b['lastReadAt'] as DateTime).compareTo(a['lastReadAt'] as DateTime));
 
-      setState(() {
-        _inProgressComics = inProgressComics;
-        _isLoading = false;
-      });
+      // Cache the result
+      _cachedReadingList = inProgressComics;
+      _lastCacheTime = DateTime.now();
+
+      return inProgressComics;
     } catch (e) {
       print('Error loading reading progress: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      return _cachedReadingList ?? [];
     }
+  }
+
+  Future<Map<String, dynamic>?> _loadComicWithProgress(String comicId, List<DocumentSnapshot> progressDocs) async {
+    try {
+      final comicDoc = await _firestore
+          .collection('comics')
+          .doc(comicId)
+          .get();
+
+      if (comicDoc.exists) {
+        final comic = Comic.fromFirestore(comicDoc);
+        // Load episodes from subcollection
+        await comic.loadEpisodes();
+        
+        // Use ReadingProgressService to calculate progress
+        final progress = await _progressService.getComicProgress(
+          comicId,
+          comic.episodes.length,
+        );
+
+        // Find latest read timestamp
+        DateTime latestTimestamp = DateTime(2000);
+        for (final doc in progressDocs) {
+          final data = doc.data() as Map<String, dynamic>;
+          if (data.containsKey('completedAt')) {
+            final timestamp = (data['completedAt'] as Timestamp).toDate();
+            if (timestamp.isAfter(latestTimestamp)) {
+              latestTimestamp = timestamp;
+            }
+          }
+        }
+
+        return {
+          'comic': comic,
+          'progress': progress,
+          'lastReadAt': latestTimestamp,
+        };
+      }
+    } catch (e) {
+      print('Error fetching comic $comicId: $e');
+    }
+    return null;
+  }
+
+  Future<void> _refreshReadingList() async {
+    // Clear cache to force reload
+    _cachedReadingList = null;
+    _lastCacheTime = null;
+    
+    // Trigger rebuild
+    setState(() {});
   }
 
   String _formatDate(DateTime date) {
@@ -803,174 +876,215 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return _buildShimmerLoading();
-    }
-    if (_inProgressComics.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32.0),
-        child: Center(
-          child: Text(
-            'No stories/comics in progress.',
-            style: TextStyle(color: Colors.white54, fontSize: 16),
-          ),
-        ),
-      );
-    }
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      itemCount: _inProgressComics.length,
-      itemBuilder: (context, index) {
-        final item = _inProgressComics[index];
-        final comic = item['comic'] as Comic;
-        final progress = item['progress'] as double;
-        final lastReadAt = item['lastReadAt'] as DateTime;
-        final showContinue = widget.isOwnProfile;
-        return Container(
-          margin: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(8),
-                  bottomLeft: Radius.circular(8),
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _getReadingProgressStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+          return _buildShimmerLoading();
+        } else if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, color: Colors.red, size: 48),
+                SizedBox(height: 16),
+                Text(
+                  'Error loading reading progress',
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
-                child: Image.network(
-                  comic.coverImage,
-                  height: 140,
-                  width: 95,
-                  fit: BoxFit.cover,
+                SizedBox(height: 8),
+                TextButton(
+                  onPressed: _refreshReadingList,
+                  child: Text(
+                    'Retry',
+                    style: TextStyle(color: Color(0xFFA3D749)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else if (snapshot.hasData && snapshot.data != null) {
+          final readingList = snapshot.data!;
+          if (readingList.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32.0),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.menu_book_outlined, color: Colors.grey[600], size: 48),
+                    SizedBox(height: 16),
+                    Text(
+                      'No stories/comics in progress.',
+                      style: TextStyle(color: Colors.white54, fontSize: 16),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Start reading to see your progress here',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
+                  ],
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(12, 4, 12, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      Text(
-                        comic.title,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+            );
+          }
+          return ListView.builder(
+            shrinkWrap: true,
+            physics: NeverScrollableScrollPhysics(),
+            itemCount: readingList.length,
+            itemBuilder: (context, index) {
+              final item = readingList[index];
+              final comic = item['comic'] as Comic;
+              final progress = item['progress'] as double;
+              final lastReadAt = item['lastReadAt'] as DateTime;
+              final showContinue = widget.isOwnProfile;
+              return Container(
+                margin: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(8),
+                        bottomLeft: Radius.circular(8),
                       ),
-                      SizedBox(height: 2),
-                      Text(
-                        comic.author,
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 13,
-                          fontWeight: FontWeight.w400,
-                        ),
+                      child: Image.network(
+                        comic.coverImage,
+                        height: 140,
+                        width: 95,
+                        fit: BoxFit.cover,
                       ),
-                      SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Icon(Icons.menu_book_rounded, color: Color(0xFFA3D749), size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            '${comic.episodes.length} Episodes',
-                            style: TextStyle(
-                              color: Colors.grey[300],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '${progress.toInt()}% Completed',
-                            style: TextStyle(
-                              color: Color(0xFFA3D749),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            'Last Read: ${_formatDate(lastReadAt)}',
-                            style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 11,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress / 100,
-                          backgroundColor: Colors.grey[900],
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFA3D749)),
-                          minHeight: 3,
-                        ),
-                      ),
-                      if (showContinue) ...[
-                        SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(12, 4, 12, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => ComicDetailScreen(
-                                      comic: comic,
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                backgroundColor: Colors.transparent,
+                            Text(
+                              comic.title,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Continue Reading',
-                                    style: TextStyle(
-                                      color: Color(0xFFA3D749),
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              comic.author,
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 13,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Icon(Icons.menu_book_rounded, color: Color(0xFFA3D749), size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  '${comic.episodes.length} Episodes',
+                                  style: TextStyle(
+                                    color: Colors.grey[300],
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  SizedBox(width: 2),
-                                  Icon(
-                                    Icons.arrow_forward_rounded,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  '${progress.toInt()}% Completed',
+                                  style: TextStyle(
                                     color: Color(0xFFA3D749),
-                                    size: 14,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  'Last Read: ${_formatDate(lastReadAt)}',
+                                  style: TextStyle(
+                                    color: Colors.grey[400],
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                value: progress / 100,
+                                backgroundColor: Colors.grey[900],
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFA3D749)),
+                                minHeight: 3,
+                              ),
+                            ),
+                            if (showContinue) ...[
+                              SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ComicDetailScreen(
+                                            comic: comic,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      backgroundColor: Colors.transparent,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Continue Reading',
+                                          style: TextStyle(
+                                            color: Color(0xFFA3D749),
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        SizedBox(width: 2),
+                                        Icon(
+                                          Icons.arrow_forward_rounded,
+                                          color: Color(0xFFA3D749),
+                                          size: 14,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
-                            ),
+                            ],
                           ],
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        );
+              );
+            },
+          );
+        }
+        return _buildShimmerLoading();
       },
     );
   }

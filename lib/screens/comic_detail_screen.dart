@@ -12,6 +12,8 @@ import '../widgets/episode_list_tile.dart';
 import '../screens/episode_detail/episode_detail_screen.dart';
 import 'home_screen.dart';
 import '../theme/app_theme.dart';
+import '../widgets/comments_bottom_sheet.dart';
+import '../utils/image_optimization.dart';
 
 
 // Theme colors to match the reader screen
@@ -317,48 +319,13 @@ class _ComicDetailScreenState extends State<ComicDetailScreen> {
           if (_episodes.isNotEmpty) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: CachedNetworkImage(
+              child: ImageOptimization.episodeImage(
                 imageUrl: _episodes.first.previewImage.isNotEmpty
                     ? _episodes.first.previewImage
                     : (_episodes.first.images.isNotEmpty ? _episodes.first.images.first : ''),
-                placeholder: (context, url) {
-                  print("Loading preview image: $url");
-                  return Container(
-                    height: 400,
-                    color: Colors.grey[900],
-
-                  );
-                },
-                errorWidget: (context, url, error) {
-                  print("Error loading preview image: $url, error: $error");
-                  return Container(
-                    height: 400,
-                    color: Colors.grey[900],
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            color: Colors.red,
-                            size: 48,
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'Failed to load image',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontFamily: _fontFamily,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-                fit: BoxFit.cover,
                 width: double.infinity,
+                height: null,
+                fit: BoxFit.fitWidth,
               ),
             ),
           ] else if (_isLoadingEpisodes) ...[

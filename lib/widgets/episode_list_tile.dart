@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/episode_model.dart';
 import '../services/reading_progress_service.dart';
+import '../utils/image_optimization.dart';
 
 class EpisodeListTile extends StatefulWidget {
   final Episode episode;
@@ -62,36 +62,20 @@ class _EpisodeListTileState extends State<EpisodeListTile> {
               // Episode thumbnail
               Stack(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: CachedNetworkImage(
-                      imageUrl: widget.episode.previewImage.isNotEmpty
-                          ? widget.episode.previewImage
-                          : (widget.episode.images.isNotEmpty ? widget.episode.images.first : ''),
-                      fit: BoxFit.cover,
-                      height: 80,
-                      width: 80,
-                      placeholder: (context, url) => Container(
-                        height: 80,
-                        width: 80,
-                        color: Colors.grey[900],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        height: 80,
-                        width: 80,
-                        color: Colors.grey[900],
-                        child: Center(
-                          child: Icon(
-                            Icons.error_outline,
-                            color: Colors.red,
-                            size: 24,
-                          ),
+                  SizedBox(
+                    width: 80,
+                    height: 80,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: AspectRatio(
+                        aspectRatio: 1.0, // Square aspect ratio
+                        child: ImageOptimization.thumbnailImage(
+                          imageUrl: widget.episode.previewImage.isNotEmpty
+                              ? widget.episode.previewImage
+                              : (widget.episode.images.isNotEmpty ? widget.episode.images.first : ''),
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),

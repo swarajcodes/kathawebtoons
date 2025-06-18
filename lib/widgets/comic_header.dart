@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../models/comic_model.dart';
+import '../utils/image_optimization.dart';
 
 class ComicHeader extends StatelessWidget {
   final Comic comic;
@@ -16,24 +16,11 @@ class ComicHeader extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           height: double.infinity,
-          child: CachedNetworkImage(
+          child: ImageOptimization.heroImage(
             imageUrl: comic.heroLandscapeImage,
+            width: double.infinity,
+            height: double.infinity,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.black,
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.black,
-              child: const Icon(
-                Icons.error,
-                color: Colors.red,
-              ),
-            ),
           ),
         ),
 

@@ -448,6 +448,10 @@ class AppTheme {
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.5),
         borderRadius: BorderRadius.circular(4.0),
+        border: Border.all(
+          color: Color(0xFFA3D749),
+          width: 1.0,
+        ),
       ),
       child: Text(
         label,

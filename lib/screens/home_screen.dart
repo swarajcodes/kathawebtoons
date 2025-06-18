@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/webnovel_episode.dart';
 import '../widgets/hero_carousel.dart';
 import '../widgets/comic_tile.dart';
+import '../widgets/cache_monitor.dart';
 import '../models/comic_model.dart';
+import '../utils/image_optimization.dart';
 import 'comic_detail_screen.dart';
 import 'webnovel_episode_screen.dart';
 
@@ -283,37 +286,48 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   /// Prefetches images in priority order to optimize loading experience
   Future<void> _prefetchImagesInOrder(List<Comic> comics) async {
-    final List<Future<void>> futures = [];
-
     // 1. Hero comics (highest priority - visible first)
     final heroComics = comics.where((c) => c.isHero).toList();
     for (final comic in heroComics) {
       if (comic.heroLandscapeImage.isNotEmpty) {
-        futures.add(_precacheImage(comic.heroLandscapeImage));
+        await ImageOptimization.preloadImage(comic.heroLandscapeImage, context, type: 'hero');
       }
       if (comic.coverImage.isNotEmpty) {
-        futures.add(_precacheImage(comic.coverImage));
+        await ImageOptimization.preloadImage(comic.coverImage, context, type: 'cover');
       }
     }
 
     // 2. Recommended comics (second priority)
     final recommendedComics = comics.where((c) => c.isRecommended).toList();
-    for (final comic in recommendedComics) {
-      if (comic.coverImage.isNotEmpty) {
-        futures.add(_precacheImage(comic.coverImage));
-      }
+    final recommendedImageUrls = recommendedComics
+        .where((c) => c.coverImage.isNotEmpty)
+        .map((c) => c.coverImage)
+        .toList();
+    
+    if (recommendedImageUrls.isNotEmpty) {
+      await ImageOptimization.preloadImagesWithPriority(
+        recommendedImageUrls, 
+        context, 
+        type: 'cover',
+        maxConcurrent: 2,
+      );
     }
 
     // 3. Webnovels (lower priority - may be below fold)
     final webnovels = comics.where((c) => c.type == 'webnovel').toList();
-    for (final comic in webnovels) {
-      if (comic.coverImage.isNotEmpty) {
-        futures.add(_precacheImage(comic.coverImage));
-      }
+    final webnovelImageUrls = webnovels
+        .where((c) => c.coverImage.isNotEmpty)
+        .map((c) => c.coverImage)
+        .toList();
+    
+    if (webnovelImageUrls.isNotEmpty) {
+      await ImageOptimization.preloadImagesWithPriority(
+        webnovelImageUrls, 
+        context, 
+        type: 'cover',
+        maxConcurrent: 1, // Lower concurrency for lower priority
+      );
     }
-
-    // Wait for all images to be preloaded
-    await Future.wait(futures);
   }
 
   /// Helper method to precache a single image with error handling
@@ -326,8 +340,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       }
 
       // If not cached, load and cache it
-      final provider = NetworkImage(imageUrl);
-      await precacheImage(provider, context);
+      await ImageOptimization.preloadImage(imageUrl, context, type: 'cover');
+      final provider = CachedNetworkImageProvider(imageUrl);
       ComicRepository.cacheImage(imageUrl, provider);
     } catch (e) {
       print("Error precaching image $imageUrl: $e");
@@ -340,148 +354,152 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
     return Scaffold(
       backgroundColor: Color(0xFF000000),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            _contentReady = false;
-            _isDataFetched = false;
-          });
-          await _repository.fetchComics(forceRefresh: true);
-          await _initializeData();
-        },
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Stack(
-                children: [
-                  if (!_contentReady)
-                    AnimatedOpacity(
-                      opacity: !_contentReady ? 1.0 : 0.0,
-                      duration: Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      child: _buildShimmerLoading(),
-                    ),
-                  if (_cachedComics != null)
-                    AnimatedOpacity(
-                      opacity: _contentReady ? 1.0 : 0.0,
-                      duration: Duration(milliseconds: 400),
-                      curve: Curves.easeInOut,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Hero Carousel Section
-                          HeroCarousel(
-                            heroComics: _cachedComics?.where((c) => c.isHero).toList() ?? [],
-                            onComicTap: (comic) => _navigateToDetail(context, comic),
-                          ),
-                          SizedBox(height: 20),
-
-                          // For You Section
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: Text(
-                              'For You ✨',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
+      body: Stack(
+        children: [
+          RefreshIndicator(
+            onRefresh: () async {
+              setState(() {
+                _contentReady = false;
+                _isDataFetched = false;
+              });
+              await _repository.fetchComics(forceRefresh: true);
+              await _initializeData();
+            },
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Stack(
+                    children: [
+                      if (!_contentReady)
+                        AnimatedOpacity(
+                          opacity: !_contentReady ? 1.0 : 0.0,
+                          duration: Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          child: _buildShimmerLoading(),
+                        ),
+                      if (_cachedComics != null)
+                        AnimatedOpacity(
+                          opacity: _contentReady ? 1.0 : 0.0,
+                          duration: Duration(milliseconds: 400),
+                          curve: Curves.easeInOut,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Hero Carousel Section
+                              HeroCarousel(
+                                heroComics: _cachedComics?.where((c) => c.isHero).toList() ?? [],
+                                onComicTap: (comic) => _navigateToDetail(context, comic),
                               ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                            child: GridView.builder(
-                              shrinkWrap: true,
-                              physics: NeverScrollableScrollPhysics(), // Optional: prevents scroll if nested in another scroll
-                              itemCount: _cachedComics
-                                  ?.where((c) => c.isRecommended && c.type != 'webnovel')
-                                  .length ?? 0,
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3, // 2 cards per row
-                                crossAxisSpacing: 16, // horizontal space between columns
-                                // mainAxisSpacing: 16, // vertical space between rows
-                                childAspectRatio: 0.45, // controls height of each card
-                              ),
-                              itemBuilder: (context, index) {
-                                final recommendedComics = _cachedComics
-                                    ?.where((c) => c.isRecommended && c.type != 'webnovel')
-                                    .toList() ??
-                                    [];
+                              SizedBox(height: 20),
 
-                                final comic = recommendedComics.isNotEmpty
-                                    ? recommendedComics[index]
-                                    : Comic(
-                                  id: 'default',
-                                  title: 'No Recommended Comic',
-                                  author: 'Unknown',
-                                  description: 'No description available',
-                                  coverImage: 'https://via.placeholder.com/150',
-                                  heroLandscapeImage: 'https://via.placeholder.com/150',
-                                  isHero: false,
-                                  isWebnovel: false,
-                                  episodes: [],
-                                  genre: [],
-                                  isRecommended: true,
-                                  isNew: false,
-                                  type: 'webtoon',
-                                );
-
-                                return ComicTile(
-                                  comic: comic,
-                                  onTap: () => _navigateToDetail(context, comic),
-                                );
-                              },
-                            ),
-                          ),
-
-
-                          // Webnovels Section
-                          if (_cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList().isNotEmpty == true) ...[
-                            SizedBox(height: 20),
-                            // Webnovels header with same style as For You
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                              child: Text(
-                                'Explore Webnovels 📚',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
+                              // For You Section
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                child: Text(
+                                  'For You ✨',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                               ),
-                            ),
-                            SizedBox(height: 10),
-                            // Webnovels list with same container style
-                            Container(
-                              height: 220,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                padding: EdgeInsets.symmetric(horizontal: 16),
-                                itemCount: _cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList().length ?? 0,
-                                itemBuilder: (context, index) {
-                                  final webnovels = _cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList() ?? [];
-                                  if (webnovels.isEmpty || index >= webnovels.length) {
-                                    return SizedBox.shrink(); // Return empty widget if no webnovels or index out of bounds
-                                  }
-                                  return Container(
-                                    margin: EdgeInsets.only(right: 16),
-                                    child: ComicTile(
-                                      comic: webnovels[index],
-                                      onTap: () => _navigateToDetail(context, webnovels[index]),
-                                    ),
-                                  );
-                                },
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                child: GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: NeverScrollableScrollPhysics(),
+                                  itemCount: _cachedComics
+                                      ?.where((c) => c.isRecommended && c.type != 'webnovel')
+                                      .length ?? 0,
+                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 16,
+                                    childAspectRatio: 0.45,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final recommendedComics = _cachedComics
+                                        ?.where((c) => c.isRecommended && c.type != 'webnovel')
+                                        .toList() ??
+                                        [];
+
+                                    final comic = recommendedComics.isNotEmpty
+                                        ? recommendedComics[index]
+                                        : Comic(
+                                      id: 'default',
+                                      title: 'No Recommended Comic',
+                                      author: 'Unknown',
+                                      description: 'No description available',
+                                      coverImage: 'https://via.placeholder.com/150',
+                                      heroLandscapeImage: 'https://via.placeholder.com/150',
+                                      isHero: false,
+                                      isWebnovel: false,
+                                      episodes: [],
+                                      genre: [],
+                                      isRecommended: true,
+                                      isNew: false,
+                                      type: 'webtoon',
+                                    );
+
+                                    return ComicTile(
+                                      comic: comic,
+                                      onTap: () => _navigateToDetail(context, comic),
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+
+                              // Webnovels Section
+                              if (_cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList().isNotEmpty == true) ...[
+                                SizedBox(height: 20),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  child: Text(
+                                    'Explore Webnovels 📚',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 10),
+                                Container(
+                                  height: 280,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: EdgeInsets.symmetric(horizontal: 16),
+                                    itemCount: _cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).length ?? 0,
+                                    itemBuilder: (context, index) {
+                                      final webnovels = _cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList() ?? [];
+                                      final comic = webnovels[index];
+                                      return Container(
+                                        width: 120,
+                                        margin: EdgeInsets.only(right: 16),
+                                        child: ComicTile(
+                                          comic: comic,
+                                          onTap: () => _navigateToWebnovel(context, comic),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                              
+                              // Add bottom padding to create space from bottom navigation
+                              SizedBox(height: 160),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          // Add cache monitor for debugging
+          // const CacheMonitor(),
+        ],
       ),
     );
   }
@@ -614,30 +632,31 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       _precacheImage(comic.heroLandscapeImage);
     }
 
-    if (comic.isWebnovel) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => WebnovelEpisodeScreen(
-            comic: comic,
-            episode: WebnovelEpisode(
-              id: comic.episodes.first.id,
-              title: comic.episodes.first.title,
-              content: comic.episodes.first.images.first,
-              docxUrl: comic.episodes.first.images.first,
-              isLocked: comic.episodes.first.isLocked,
-              releaseDate: comic.episodes.first.releaseDate ?? DateTime.now(),
-            ),
-          ),
-        ),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ComicDetailScreen(comic: comic),
-        ),
-      );
+    // Navigate to ComicDetailScreen for both regular comics and webnovels
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ComicDetailScreen(comic: comic),
+      ),
+    );
+  }
+
+  /// Navigates to the webnovel detail screen
+  void _navigateToWebnovel(BuildContext context, Comic comic) {
+    // Pre-cache the comic's images before navigating
+    if (comic.coverImage.isNotEmpty) {
+      _precacheImage(comic.coverImage);
     }
+    if (comic.heroLandscapeImage.isNotEmpty) {
+      _precacheImage(comic.heroLandscapeImage);
+    }
+
+    // Navigate to ComicDetailScreen for webnovels
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ComicDetailScreen(comic: comic),
+      ),
+    );
   }
 }

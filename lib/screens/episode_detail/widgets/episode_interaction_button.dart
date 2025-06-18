@@ -25,8 +25,8 @@ class EpisodeInteractionButton extends StatelessWidget {
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 0.5,
+            color: Color(0xFFA3D749),
+            width: 1.0,
           ),
         ),
         child: Column(

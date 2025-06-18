@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:kathawebtoons/utils/image_optimization.dart';
+import 'package:kathawebtoons/screens/episode_detail/episode_view_manager.dart';
 
 class DocumentViewer extends StatefulWidget {
   final List<String> imageUrls;
   final TransformationController transformationController;
   final ScrollController scrollController;
   final String heroTagPrefix;
+  final Widget? extraBottomWidget; // 👈 Add this
 
   const DocumentViewer({
     Key? key,
@@ -13,6 +15,7 @@ class DocumentViewer extends StatefulWidget {
     required this.transformationController,
     required this.scrollController,
     required this.heroTagPrefix,
+    this.extraBottomWidget, // 👈 Add this
   }) : super(key: key);
 
   @override
@@ -56,10 +59,8 @@ class _DocumentViewerState extends State<DocumentViewer>
     Matrix4 targetMatrix;
 
     if (currentScale > _minScale + 0.1) {
-      // Zoom out to original scale
       targetMatrix = Matrix4.identity();
     } else {
-      // Zoom in to double tap scale, centered on tap position
       final Size size = renderBox.size;
       final Offset focalPoint = localPosition;
 
@@ -68,7 +69,6 @@ class _DocumentViewerState extends State<DocumentViewer>
         ..scale(_doubleTapScale)
         ..translate(-focalPoint.dx, -focalPoint.dy);
 
-      // Ensure the zoomed content stays within bounds
       targetMatrix = _constrainMatrix(targetMatrix, size);
     }
 
@@ -96,19 +96,15 @@ class _DocumentViewerState extends State<DocumentViewer>
 
   Matrix4 _constrainMatrix(Matrix4 matrix, Size size) {
     final double scale = matrix.getMaxScaleOnAxis();
-
-    // Convert Vector3 to Offset properly
     final translationVector = matrix.getTranslation();
     final Offset translation = Offset(translationVector.x, translationVector.y);
 
-    // Calculate bounds for the entire document
     final double scaledWidth = size.width * scale;
     final double scaledHeight = size.height * scale;
 
     double constrainedX = translation.dx;
     double constrainedY = translation.dy;
 
-    // Constrain horizontal movement
     if (scaledWidth > size.width) {
       final double maxX = 0.0;
       final double minX = size.width - scaledWidth;
@@ -117,7 +113,6 @@ class _DocumentViewerState extends State<DocumentViewer>
       constrainedX = (size.width - scaledWidth) / 2;
     }
 
-    // Constrain vertical movement
     if (scaledHeight > size.height) {
       final double maxY = 0.0;
       final double minY = size.height - scaledHeight;
@@ -145,26 +140,17 @@ class _DocumentViewerState extends State<DocumentViewer>
           maxScale: _maxScale,
           constrained: true,
           boundaryMargin: const EdgeInsets.all(20.0),
-          // Add these properties to reduce delay
           panEnabled: true,
           scaleEnabled: true,
-          // This helps with gesture recognition
           clipBehavior: Clip.none,
-          onInteractionStart: (ScaleStartDetails details) {
-            // Immediately respond to gesture start
-            if (details.pointerCount >= 2) {
-              // Two fingers detected - prepare for zoom
-            }
-          },
-          onInteractionUpdate: (ScaleUpdateDetails details) {
-            // More responsive updates
-          },
           onInteractionEnd: (ScaleEndDetails details) {
-            // Bounce back to bounds if needed
-            final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+            final RenderBox? renderBox =
+            context.findRenderObject() as RenderBox?;
             if (renderBox != null) {
-              final Matrix4 currentMatrix = widget.transformationController.value;
-              final Matrix4 constrainedMatrix = _constrainMatrix(currentMatrix, renderBox.size);
+              final Matrix4 currentMatrix =
+                  widget.transformationController.value;
+              final Matrix4 constrainedMatrix =
+              _constrainMatrix(currentMatrix, renderBox.size);
 
               if (currentMatrix != constrainedMatrix) {
                 _animateToMatrix(constrainedMatrix);
@@ -175,42 +161,32 @@ class _DocumentViewerState extends State<DocumentViewer>
             controller: widget.scrollController,
             physics: const BouncingScrollPhysics(),
             child: Column(
-              children: widget.imageUrls.asMap().entries.map((entry) {
-                int index = entry.key;
-                String imageUrl = entry.value;
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...widget.imageUrls.asMap().entries.map((entry) {
+                  int index = entry.key;
+                  String imageUrl = entry.value;
 
-                return Container(
-                  width: MediaQuery.of(context).size.width,
-                  margin: const EdgeInsets.symmetric(vertical: 2),
-                  child: Hero(
-                    tag: "${widget.heroTagPrefix}_$index",
-                    child: CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.fitWidth, // Fit to screen width, maintain aspect ratio
-                      placeholder: (context, url) => Container(
-                        height: 400,
-                        color: Colors.grey.shade900,
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.lightGreenAccent,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        height: 400,
-                        color: Colors.grey.shade900,
-                        child: const Center(
-                          child: Icon(
-                            Icons.error,
-                            color: Colors.red,
-                            size: 50,
-                          ),
-                        ),
+                  return Container(
+                    width: MediaQuery.of(context).size.width,
+                    margin: const EdgeInsets.symmetric(vertical: 2),
+                    child: Hero(
+                      tag: "${widget.heroTagPrefix}_$index",
+                      child: ImageOptimization.episodeViewerImage(
+                        imageUrl: imageUrl,
+                        width: MediaQuery.of(context).size.width,
+                        height: null,
+                        fit: BoxFit.fitWidth,
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }),
+                if (widget.extraBottomWidget != null) ...[
+                  const SizedBox(height: 24),
+                  widget.extraBottomWidget!,
+                  const SizedBox(height: 48),
+                ],
+              ],
             ),
           ),
         ),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../models/comment_model.dart';
 import '../services/comments_service.dart';
+import 'package:kathawebtoons/theme/app_theme.dart';
+
 
 class InstagramCommentTile extends StatefulWidget {
   final Comment comment;
@@ -91,7 +93,10 @@ class _InstagramCommentTileState extends State<InstagramCommentTile> {
                 radius: 16,
                 backgroundColor: Colors.grey[800],
                 backgroundImage: widget.comment.userProfileImage.isNotEmpty
-                    ? CachedNetworkImageProvider(widget.comment.userProfileImage)
+                    ? CachedNetworkImageProvider(
+                        widget.comment.userProfileImage,
+                        cacheKey: 'profile_${widget.comment.userProfileImage.hashCode}',
+                      )
                     : null,
                 child: widget.comment.userProfileImage.isEmpty
                     ? Icon(Icons.person, color: Colors.white54, size: 16)

@@ -166,6 +166,10 @@ class HeroComicCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Color(0xFFA3D749).withValues(alpha: 0.7),
+                              width: 1,
+                            ),
                           ),
                           child: Text(
                             comic.genre[0],
@@ -181,6 +185,10 @@ class HeroComicCard extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: Color(0xFFA3D749).withValues(alpha: 0.7),
+                              width: 1,
+                            ),
                           ),
                           child: Text(
                             comic.genre[1],

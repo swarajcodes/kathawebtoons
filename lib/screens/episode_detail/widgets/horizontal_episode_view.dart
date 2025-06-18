@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import '../../../models/episode_model.dart';
 import '../episode_view_manager.dart';
 import 'zoomable_image.dart';
+import 'lazy_episode_view.dart';
 
 class HorizontalEpisodeView extends StatelessWidget {
   final PageController controller;
   final Episode episode;
   final Function(int)? onPageChanged;
   final EpisodeViewManager viewManager;
+  final Set<String> preloadedImages;
+  final bool useLazyLoading;
 
   const HorizontalEpisodeView({
     Key? key,
@@ -15,10 +18,22 @@ class HorizontalEpisodeView extends StatelessWidget {
     required this.episode,
     this.onPageChanged,
     required this.viewManager,
+    this.preloadedImages = const {},
+    this.useLazyLoading = true,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    if (useLazyLoading) {
+      return LazyEpisodeView(
+        controller: controller,
+        episode: episode,
+        onPageChanged: onPageChanged,
+        viewManager: viewManager,
+        preloadedImages: preloadedImages,
+      );
+    }
+    
     return PageView.builder(
       controller: controller,
       itemCount: episode.images.length,

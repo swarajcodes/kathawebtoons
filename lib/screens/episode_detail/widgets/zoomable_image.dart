@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:kathawebtoons/utils/image_optimization.dart';
 
 class ZoomableImage extends StatefulWidget {
   final String imageUrl;
@@ -158,29 +158,11 @@ class _ZoomableImageState extends State<ZoomableImage>
               }
             },
             child: Center( // Center the image to prevent pre-zoom
-              child: CachedNetworkImage(
+              child: ImageOptimization.episodeViewerImage(
                 imageUrl: widget.imageUrl,
-                fit: BoxFit.contain, // This ensures the image fits without cropping
                 width: double.infinity,
                 height: double.infinity,
-                placeholder: (context, url) => Container(
-                  color: Colors.grey.shade900,
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.lightGreenAccent,
-                    ),
-                  ),
-                ),
-                errorWidget: (context, url, error) => Container(
-                  color: Colors.grey.shade900,
-                  child: const Center(
-                    child: Icon(
-                      Icons.error,
-                      color: Colors.red,
-                      size: 50,
-                    ),
-                  ),
-                ),
+                fit: BoxFit.contain, // This ensures the image fits without cropping
               ),
             ),
           ),

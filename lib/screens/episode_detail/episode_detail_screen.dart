@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../models/comic_model.dart' as comic_model;
 import '../../models/episode_model.dart';
 import '../../widgets/comments_bottom_sheet.dart';
+import '../../utils/image_optimization.dart';
 import '/screens/episode_detail/episode_progress_service.dart';
 import '/screens/episode_detail/episode_view_manager.dart';
 import '/screens/episode_detail/widgets/episode_control_bar.dart';
@@ -64,6 +65,11 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
   String _currentTime = '';
   late Timer _timer;
   StreamSubscription<BatteryState>? _batteryStateSubscription;
+  
+  // Image preloading state
+  Set<String> _preloadedImages = {};
+  bool _isPreloading = false;
+  Timer? _preloadTimer;
 
   @override
   void initState() {
@@ -86,6 +92,9 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
     // Setup listeners
     viewManager.horizontalPageController.addListener(_handleHorizontalPageChange);
     viewManager.verticalScrollController.addListener(_handleVerticalScroll);
+    
+    // Initialize image preloading
+    _initializeImagePreloading();
   }
 
   @override
@@ -97,6 +106,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
   @override
   void dispose() {
     _timer.cancel();
+    _preloadTimer?.cancel();
     _batteryStateSubscription?.cancel();
     viewManager.dispose();
     SecureScreenHandler.disableSecureScreen(); // Disable screenshot protection
@@ -119,6 +129,9 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
         if (progress > 0.8 && !progressService.hasMarkedAsRead) {
           progressService.markAsRead(percentage: progress);
         }
+        
+        // Trigger predictive preloading on page change
+        _predictivePreload();
       }
     }
   }
@@ -130,14 +143,20 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
 
       if (totalHeight > 0) {
         double progress = (offset / totalHeight).clamp(0.0, 1.0);
+        final newPage = (progress * (widget.episode.images.length - 1)).round();
 
         setState(() {
           viewManager.scrollProgress = progress;
-          viewManager.currentPage = (progress * (widget.episode.images.length - 1)).round();
+          viewManager.currentPage = newPage;
         });
 
         if (progress > 0.8 && !progressService.hasMarkedAsRead) {
           progressService.markAsRead(percentage: progress);
+        }
+        
+        // Trigger predictive preloading on significant scroll
+        if (newPage != viewManager.currentPage) {
+          _predictivePreload();
         }
       }
     }
@@ -179,9 +198,110 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
     return Icons.battery_1_bar;
   }
 
+  /// Initialize image preloading for the episode
+  Future<void> _initializeImagePreloading() async {
+    if (_isPreloading) return;
+    
+    setState(() {
+      _isPreloading = true;
+    });
+    
+    try {
+      // Preload first few images immediately
+      await _preloadEpisodeImages(0);
+      
+      // Set up predictive preloading timer
+      _preloadTimer = Timer.periodic(Duration(seconds: 2), (timer) {
+        _predictivePreload();
+      });
+    } catch (e) {
+      print('Error initializing image preloading: $e');
+    } finally {
+      setState(() {
+        _isPreloading = false;
+      });
+    }
+  }
+
+  /// Preload episode images starting from a specific index
+  Future<void> _preloadEpisodeImages(int startIndex) async {
+    final images = widget.episode.images;
+    if (images.isEmpty) return;
+    
+    final preloadUrls = <String>[];
+    final endIndex = (startIndex + 3).clamp(0, images.length - 1);
+    
+    for (int i = startIndex; i <= endIndex; i++) {
+      final imageUrl = images[i];
+      if (!_preloadedImages.contains(imageUrl)) {
+        preloadUrls.add(imageUrl);
+      }
+    }
+    
+    if (preloadUrls.isNotEmpty) {
+      try {
+        await ImageOptimization.preloadImagesWithPriority(
+          preloadUrls,
+          context,
+          type: 'episode_viewer',
+          maxConcurrent: 2,
+        );
+        
+        setState(() {
+          _preloadedImages.addAll(preloadUrls);
+        });
+        
+        print('Preloaded ${preloadUrls.length} episode images');
+      } catch (e) {
+        print('Error preloading episode images: $e');
+      }
+    }
+  }
+
+  /// Predictive preloading based on current page and user behavior
+  void _predictivePreload() {
+    if (widget.episode.images.isEmpty) return;
+    
+    final currentIndex = viewManager.currentPage;
+    final totalImages = widget.episode.images.length;
+    
+    // Preload next 2 images if not already loaded
+    final nextIndex = currentIndex + 1;
+    if (nextIndex < totalImages) {
+      _preloadEpisodeImages(nextIndex);
+    }
+    
+    // Preload previous image for better back navigation
+    final prevIndex = currentIndex - 1;
+    if (prevIndex >= 0) {
+      final prevImageUrl = widget.episode.images[prevIndex];
+      if (!_preloadedImages.contains(prevImageUrl)) {
+        ImageOptimization.preloadImage(prevImageUrl, context, type: 'episode_viewer');
+        setState(() {
+          _preloadedImages.add(prevImageUrl);
+        });
+      }
+    }
+  }
+
+  /// Preload a single image with error handling
+  Future<void> _preloadImage(String imageUrl) async {
+    if (_preloadedImages.contains(imageUrl)) return;
+    
+    try {
+      await ImageOptimization.preloadImage(imageUrl, context, type: 'episode_viewer');
+      setState(() {
+        _preloadedImages.add(imageUrl);
+      });
+    } catch (e) {
+      print('Error preloading image $imageUrl: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final appBarHeight = AppBar().preferredSize.height;
 
     return Scaffold(
       backgroundColor: _darkBackground,
@@ -229,37 +349,45 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
               },
               child: Stack(
                 children: [
-                  viewManager.isHorizontalMode
-                      ? HorizontalEpisodeView(
-                    controller: viewManager.horizontalPageController,
-                    episode: widget.episode,
-                    onPageChanged: (page) {
-                      setState(() {
-                        viewManager.currentPage = page;
-                      });
-                    },
-                    viewManager: viewManager, // Add this line
-                  )
-                      : VerticalEpisodeView(
-                    controller: viewManager.verticalScrollController,
-                    episode: widget.episode,
-                    nextEpisode: progressService.nextEpisode,
-                    isLastEpisode: progressService.isLastEpisode,
-                    currentPage: viewManager.currentPage,
-                    onNextEpisodePressed: () {
-                      if (progressService.nextEpisode != null) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EpisodeDetailScreen(
-                              comic: widget.comic,
-                              episode: progressService.nextEpisode!,
+                  // Add padding for non-fullscreen mode to prevent title bar overlap
+                  Padding(
+                    padding: viewManager.isFullscreenMode 
+                        ? EdgeInsets.zero 
+                        : EdgeInsets.only(top: topPadding + appBarHeight),
+                    child: viewManager.isHorizontalMode
+                        ? HorizontalEpisodeView(
+                      controller: viewManager.horizontalPageController,
+                      episode: widget.episode,
+                      onPageChanged: (page) {
+                        setState(() {
+                          viewManager.currentPage = page;
+                        });
+                      },
+                      viewManager: viewManager,
+                      preloadedImages: _preloadedImages,
+                      useLazyLoading: true,
+                    )
+                        : VerticalEpisodeView(
+                      controller: viewManager.verticalScrollController,
+                      episode: widget.episode,
+                      nextEpisode: progressService.nextEpisode,
+                      isLastEpisode: progressService.isLastEpisode,
+                      currentPage: viewManager.currentPage,
+                      onNextEpisodePressed: () {
+                        if (progressService.nextEpisode != null) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EpisodeDetailScreen(
+                                comic: widget.comic,
+                                episode: progressService.nextEpisode!,
+                              ),
                             ),
-                          ),
-                        );
-                      }
-                    },
-                    viewManager: viewManager,
+                          );
+                        }
+                      },
+                      viewManager: viewManager,
+                    ),
                   ),
 
                   if (!viewManager.isFullscreenMode)
@@ -280,7 +408,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                           context: context,
                           isScrollControlled: true,
                           backgroundColor: Colors.transparent,
-                          barrierColor: Colors.black.withOpacity(0.2),
+                          barrierColor: Colors.black.withOpacity(0.4),
                           builder: (context) => CommentsBottomSheet(
                             comicId: widget.comic.id,
                             episodeId: widget.episode.id,

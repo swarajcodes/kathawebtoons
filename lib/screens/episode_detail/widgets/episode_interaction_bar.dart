@@ -103,7 +103,7 @@ class _EpisodeInteractionBarState extends State<EpisodeInteractionBar> {
                 maxHeight: MediaQuery.of(context).size.height * 0.4,
               ),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withOpacity(0.7),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20),
                   bottomLeft: Radius.circular(20),
@@ -112,13 +112,6 @@ class _EpisodeInteractionBarState extends State<EpisodeInteractionBar> {
                   color: Colors.white.withOpacity(0.1),
                   width: 1,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -183,22 +176,15 @@ class _EpisodeInteractionBarState extends State<EpisodeInteractionBar> {
               width: 35,
               height: 70,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withOpacity(0.7),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(15),
                   bottomLeft: Radius.circular(15),
                 ),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Color(0xFFA3D749),
                   width: 1,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    spreadRadius: 1,
-                  ),
-                ],
               ),
               child: Center(
                 child: AnimatedRotation(

@@ -107,7 +107,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
             filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withOpacity(0.6),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 border: Border.all(
                   color: Colors.white.withOpacity(0.1),
@@ -115,7 +115,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withOpacity(0.5),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -157,7 +157,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                         ),
                         Spacer(),
                         IconButton(
-                          icon: Icon(Icons.close, color: Colors.white.withOpacity(0.8)),
+                          icon: Icon(Icons.close, color: Colors.white.withOpacity(0.9)),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -241,7 +241,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                       decoration: BoxDecoration(
                         color: Colors.grey[900]?.withOpacity(0.5),
                         border: Border(
-                          top: BorderSide(color: Colors.white.withOpacity(0.1), width: 1),
+                          top: BorderSide(color: Colors.white.withOpacity(0.3), width: 1),
                         ),
                       ),
                       child: Row(
@@ -288,7 +288,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                     decoration: BoxDecoration(
                       border: Border(
                         top: BorderSide(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Colors.white.withOpacity(0.4),
                             width: 1
                         ),
                       ),
@@ -300,7 +300,7 @@ class _CommentsBottomSheetState extends State<CommentsBottomSheet> {
                           child: Container(
                             constraints: BoxConstraints(maxHeight: 120),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withOpacity(0.4),
                               borderRadius: BorderRadius.circular(25),
                               border: Border.all(
                                 color: Colors.white.withOpacity(0.2),

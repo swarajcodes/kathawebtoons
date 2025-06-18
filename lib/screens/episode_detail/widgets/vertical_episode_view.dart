@@ -30,54 +30,49 @@ class VerticalEpisodeView extends StatefulWidget {
 class _VerticalEpisodeViewState extends State<VerticalEpisodeView> {
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        DocumentViewer(
-          imageUrls: widget.episode.images,
-          transformationController: widget.viewManager.documentTransformationController,
-          scrollController: widget.controller,
-          heroTagPrefix: "page_${widget.episode.id}",
-        ),
-        if (widget.nextEpisode != null && !widget.isLastEpisode && widget.currentPage == widget.episode.images.length - 1)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: MediaQuery.of(context).padding.bottom + 100,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: ElevatedButton(
-                onPressed: widget.onNextEpisodePressed,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFA3D749),
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Next Chapter',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Plus Jakarta Sans',
+    final showNextButton = widget.nextEpisode != null &&
+        !widget.isLastEpisode &&
+        widget.currentPage == widget.episode.images.length - 1;
 
-                      ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(
-                      Icons.arrow_forward,
-                      color: Colors.black,
-                    ),
-                  ],
-                ),
-              ),
+    return DocumentViewer(
+      imageUrls: widget.episode.images,
+      transformationController: widget.viewManager.documentTransformationController,
+      scrollController: widget.controller,
+      heroTagPrefix: "page_${widget.episode.id}",
+      extraBottomWidget: showNextButton
+          ? Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
+        child: ElevatedButton(
+          onPressed: widget.onNextEpisodePressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFA3D749),
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
-      ],
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Next Chapter',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Plus Jakarta Sans',
+                ),
+              ),
+              SizedBox(width: 10),
+              Icon(
+                Icons.arrow_forward,
+                color: Colors.black,
+              ),
+            ],
+          ),
+        ),
+      )
+          : null,
     );
   }
 }

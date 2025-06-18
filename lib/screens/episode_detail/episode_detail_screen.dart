@@ -238,6 +238,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                         viewManager.currentPage = page;
                       });
                     },
+                    viewManager: viewManager, // Add this line
                   )
                       : VerticalEpisodeView(
                     controller: viewManager.verticalScrollController,
@@ -258,6 +259,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                         );
                       }
                     },
+                    viewManager: viewManager,
                   ),
 
                   if (!viewManager.isFullscreenMode)
@@ -278,7 +280,7 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                           context: context,
                           isScrollControlled: true,
                           backgroundColor: Colors.transparent,
-                          barrierColor: Colors.black.withOpacity(0.2),
+                          barrierColor: Colors.black.withOpacity(0.4),
                           builder: (context) => CommentsBottomSheet(
                             comicId: widget.comic.id,
                             episodeId: widget.episode.id,
@@ -294,7 +296,8 @@ class _EpisodeDetailScreenState extends State<EpisodeDetailScreen>
                       totalPages: widget.episode.images.length,
                       scrollProgress: viewManager.scrollProgress,
                       onViewModeToggle: () {
-                        viewManager.resetZoom();
+                        // Reset zoom to ensure a consistent state when switching view modes.
+                        //viewManager.resetZoom();
                         setState(() {
                           viewManager.isHorizontalMode = !viewManager.isHorizontalMode;
                         });

@@ -16,8 +16,9 @@ class EpisodeViewManager {
   late ScrollController verticalScrollController;
   late AnimationController interactionBarController;
   late Animation<Offset> interactionBarAnimation;
-  final TransformationController transformationController = TransformationController();
-  double previousScale = 1.0;
+
+  // Single transformation controller for the entire document
+  late TransformationController documentTransformationController;
 
   EpisodeViewManager({
     required this.episode,
@@ -26,7 +27,9 @@ class EpisodeViewManager {
     horizontalPageController = PageController();
     verticalScrollController = ScrollController();
 
-    // Initialize interaction bar in hidden state
+    // Initialize single document-level transformation controller
+    documentTransformationController = TransformationController();
+
     isInteractionBarVisible = false;
 
     interactionBarController = AnimationController(
@@ -34,39 +37,37 @@ class EpisodeViewManager {
       vsync: vsync,
     );
 
-    // Fix: Swap the begin and end values
     interactionBarAnimation = Tween<Offset>(
-      begin: Offset.zero, // Visible position
-      end: const Offset(1.5, 0.0), // Hidden position
+      begin: Offset.zero,
+      end: const Offset(1.5, 0.0),
     ).animate(CurvedAnimation(
       parent: interactionBarController,
       curve: Curves.easeOutCubic,
       reverseCurve: Curves.easeInCubic,
     ));
 
-    // Set to 1.0 to start hidden (at the end of the tween)
     interactionBarController.value = 1.0;
+  }
+
+  void resetDocumentZoom() {
+    documentTransformationController.value = Matrix4.identity();
   }
 
   void toggleFullscreenMode() {
     isFullscreenMode = !isFullscreenMode;
     if (isFullscreenMode) {
-      // Enter fullscreen mode with system UI hidden
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.immersiveSticky,
         overlays: [],
       );
-      // Lock to portrait mode
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
     } else {
-      // Exit fullscreen mode
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge,
         overlays: SystemUiOverlay.values,
       );
-      // Restore portrait orientation
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
         DeviceOrientation.portraitDown,
@@ -83,22 +84,15 @@ class EpisodeViewManager {
 
   void toggleInteractionBar() {
     if (isInteractionBarVisible) {
-      // Hide the bar - animate to hidden position (forward)
       interactionBarController.forward();
       isInteractionBarVisible = false;
     } else {
-      // Show the bar - animate to visible position (reverse)
       interactionBarController.reverse();
       isInteractionBarVisible = true;
     }
   }
 
-  void resetZoom() {
-    transformationController.value = Matrix4.identity();
-  }
-
   void dispose() {
-    // Ensure we exit fullscreen mode when disposing
     if (isFullscreenMode) {
       SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge,
@@ -112,6 +106,6 @@ class EpisodeViewManager {
     horizontalPageController.dispose();
     verticalScrollController.dispose();
     interactionBarController.dispose();
-    transformationController.dispose();
+    documentTransformationController.dispose();
   }
 }

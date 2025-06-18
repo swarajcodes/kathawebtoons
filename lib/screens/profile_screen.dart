@@ -18,19 +18,30 @@ import 'package:flutter/rendering.dart';
 import 'package:shimmer/shimmer.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String? uid; // If null, show current user's profile
+  final String? uid;
   const ProfileScreen({Key? key, this.uid}) : super(key: key);
 
   @override
   _ProfileScreenState createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with AutomaticKeepAliveClientMixin {
   File? _profileImage;
   final picker = ImagePicker();
   final AuthService _authService = AuthService();
   final UserProfileService _userProfileService = UserProfileService();
   final ReadingProgressService _progressService = ReadingProgressService();
+
+  // Cache for profile data
+  UserProfile? _cachedProfile;
+  bool _profileLoading = false;
+
+  // Cache for reading progress
+  List<Map<String, dynamic>> _cachedProgress = [];
+  bool _progressLoading = false;
+
+  @override
+  bool get wantKeepAlive => true;
 
   Future<void> _pickImage() async {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -140,11 +151,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         await _authService.signOut();
         if (!mounted) return;
-        
-        // Navigate to login screen and clear navigation stack
+
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => LoginScreen()),
-          (route) => false,
+              (route) => false,
         );
       } catch (e) {
         if (!mounted) return;
@@ -161,15 +171,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showSettingsMenu(BuildContext context, UserProfile profile) {
     final RenderBox? button = context.findRenderObject() as RenderBox?;
     if (button == null) return;
-    
+
     final Offset offset = button.localToGlobal(Offset.zero);
     final Size size = button.size;
-    
+
     showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
-        offset.dx - 110,  // Adjust menu to be centered with the icon
-        offset.dy + size.height + 5,  // Just below the icon
+        offset.dx - 110,
+        offset.dy + size.height + 5,
         offset.dx + size.width - 10,
         offset.dy + size.height + 5,
       ),
@@ -241,8 +251,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
+  Future<void> _loadProfileData(String profileUid) async {
+    if (_cachedProfile != null && !_profileLoading) return;
+
+    setState(() => _profileLoading = true);
+    try {
+      final profile = await _userProfileService.getUserProfile(profileUid);
+      setState(() {
+        _cachedProfile = profile;
+        _profileLoading = false;
+      });
+    } catch (e) {
+      setState(() => _profileLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final User? currentUser = FirebaseAuth.instance.currentUser;
     final String? profileUid = widget.uid ?? currentUser?.uid;
 
@@ -250,243 +276,170 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return _buildGuestProfile();
     }
 
+    // Load profile data if not already cached
+    if (_cachedProfile == null) {
+      _loadProfileData(profileUid);
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: StreamBuilder<UserProfile?>(
-        stream: _userProfileService.streamUserProfile(profileUid),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasData && snapshot.data != null) {
-            final profile = snapshot.data!;
-            final isOwnProfile = currentUser != null && profile.uid == currentUser.uid;
-            
-            return CustomScrollView(
-              slivers: [
-                // Banner Section
-                SliverAppBar(
-                  expandedHeight: 180,
-                  pinned: true,
-                  backgroundColor: Colors.black,
-                  flexibleSpace: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      FlexibleSpaceBar(
-                        background: profile.bannerImageUrl.isNotEmpty
-                            ? Image.network(
-                                profile.bannerImageUrl,
-                                fit: BoxFit.cover,
-                              )
-                            : Container(color: Colors.grey[900]),
+      body: _cachedProfile == null
+          ? Center(child: CircularProgressIndicator())
+          : _buildProfileContent(_cachedProfile!, currentUser),
+    );
+  }
+
+  Widget _buildProfileContent(UserProfile profile, User? currentUser) {
+    final isOwnProfile = currentUser != null && profile.uid == currentUser.uid;
+
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 180,
+          pinned: true,
+          backgroundColor: Colors.black,
+          flexibleSpace: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              FlexibleSpaceBar(
+                background: profile.bannerImageUrl.isNotEmpty
+                    ? Image.network(
+                  profile.bannerImageUrl,
+                  fit: BoxFit.cover,
+                )
+                    : Container(color: Colors.grey[900]),
+              ),
+              Positioned(
+                left: 24,
+                bottom: -35,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 10,
+                        spreadRadius: 2,
                       ),
-                      Positioned(
-                        left: 24,
-                        bottom: -35,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.3),
-                                blurRadius: 10,
-                                spreadRadius: 2,
+                    ],
+                  ),
+                  child: GestureDetector(
+                    onTap: isOwnProfile ? _showImageOptions : null,
+                    child: CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.black,
+                      backgroundImage: _profileImage != null
+                          ? FileImage(_profileImage!) as ImageProvider
+                          : (profile.profileImageUrl.isNotEmpty
+                          ? NetworkImage(profile.profileImageUrl)
+                          : AssetImage("assets/default_profile.png")) as ImageProvider,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Column(
+            children: [
+              SizedBox(height: 35),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                profile.username,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                '@${profile.handle}',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
                               ),
                             ],
                           ),
-                          child: GestureDetector(
-                            onTap: isOwnProfile ? _showImageOptions : null,
-                            child: CircleAvatar(
-                              radius: 40,
-                              backgroundColor: Colors.black,
-                              backgroundImage: _profileImage != null
-                                  ? FileImage(_profileImage!) as ImageProvider
-                                  : (profile.profileImageUrl.isNotEmpty
-                                      ? NetworkImage(profile.profileImageUrl)
-                                      : AssetImage("assets/default_profile.png")) as ImageProvider,
+                        ),
+                        if (isOwnProfile)
+                          Builder(
+                            builder: (BuildContext context) => IconButton(
+                              icon: Icon(Icons.settings, color: Colors.white, size: 20),
+                              padding: EdgeInsets.zero,
+                              constraints: BoxConstraints(),
+                              onPressed: () => _showSettingsMenu(context, profile),
                             ),
                           ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.verified, color: Colors.yellow[700], size: 14),
+                        SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            profile.bio.isNotEmpty ? profile.bio : 'No bio added',
+                            style: TextStyle(
+                              color: Colors.grey[300],
+                              fontSize: 13,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                SliverToBoxAdapter(
-                  child: Column(
-                    children: [
-                      SizedBox(height: 35),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    StreamBuilder<int>(
+                      stream: _getStoriesCount(profile.uid),
+                      builder: (context, snapshot) {
+                        final storiesCount = snapshot.data ?? 0;
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        profile.username,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        '@${profile.handle}',
-                                        style: TextStyle(
-                                          color: Colors.grey[400],
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                if (isOwnProfile)
-                                  Builder(
-                                    builder: (BuildContext context) => IconButton(
-                                      icon: Icon(Icons.settings, color: Colors.white, size: 20),
-                                      padding: EdgeInsets.zero,
-                                      constraints: BoxConstraints(),
-                                      onPressed: () {
-                                        final RenderBox button = context.findRenderObject() as RenderBox;
-                                        final Offset offset = button.localToGlobal(Offset.zero);
-                                        
-                                        showMenu<String>(
-                                          context: context,
-                                          position: RelativeRect.fromLTRB(
-                                            offset.dx - 130,
-                                            offset.dy + button.size.height,
-                                            offset.dx,
-                                            offset.dy + button.size.height + 10,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          color: Colors.grey[900],
-                                          elevation: 8,
-                                          constraints: BoxConstraints(
-                                            minWidth: 150,
-                                            maxWidth: 150,
-                                          ),
-                                          items: [
-                                            PopupMenuItem<String>(
-                                              value: 'edit',
-                                              height: 40,
-                                              child: Row(
-                                                children: [
-                                                  Text(
-                                                    '✏️',
-                                                    style: TextStyle(fontSize: 16),
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text(
-                                                    'Edit Profile',
-                                                    style: TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            PopupMenuItem<String>(
-                                              value: 'logout',
-                                              height: 40,
-                                              child: Row(
-                                                children: [
-                                                  Icon(
-                                                    Icons.logout_rounded,
-                                                    color: Colors.red[400],
-                                                    size: 18,
-                                                  ),
-                                                  SizedBox(width: 8),
-                                                  Text(
-                                                    'Logout',
-                                                    style: TextStyle(
-                                                      color: Colors.red[400],
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
-                                        ).then((value) {
-                                          if (value == 'edit') {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (context) => EditProfileScreen(
-                                                  userProfile: profile,
-                                                ),
-                                              ),
-                                            );
-                                          } else if (value == 'logout') {
-                                            _handleLogout(context);
-                                          }
-                                        });
-                                      },
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            SizedBox(height: 8),
-                            // Bio section
-                            Row(
-                              children: [
-                                Icon(Icons.verified, color: Colors.yellow[700], size: 14),
-                                SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    profile.bio.isNotEmpty ? profile.bio : 'No bio added',
-                                    style: TextStyle(
-                                      color: Colors.grey[300],
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 16),
-                            // Stats section
-                            StreamBuilder<int>(
-                              stream: _getStoriesCount(profile.uid),
-                              builder: (context, snapshot) {
-                                final storiesCount = snapshot.data ?? 0;
-                                return Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  children: [
-                                    _buildStat(storiesCount, 'Stories'),
-                                    SizedBox(width: 24),
-                                    _buildStat(profile.followers, 'Followers'),
-                                    SizedBox(width: 24),
-                                    _buildStat(profile.following, 'Following'),
-                                  ],
-                                );
-                              },
-                            ),
+                            _buildStat(storiesCount, 'Stories'),
+                            SizedBox(width: 24),
+                            _buildStat(profile.followers, 'Followers'),
+                            SizedBox(width: 24),
+                            _buildStat(profile.following, 'Following'),
                           ],
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Divider(color: Colors.grey[900]),
-                      // Reading List Section
-                      _ProfileStoriesSection(userId: profile.uid, isOwnProfile: isOwnProfile),
-                    ],
-                  ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ],
-            );
-          }
-          return Center(child: Text("Profile not found", style: TextStyle(color: Colors.white)));
-        },
-      ),
+              ),
+              SizedBox(height: 16),
+              Divider(color: Colors.grey[900]),
+              _ProfileStoriesSection(
+                userId: profile.uid,
+                isOwnProfile: isOwnProfile,
+                cachedProgress: _cachedProgress,
+                onProgressLoaded: (progress) {
+                  setState(() {
+                    _cachedProgress = progress;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -579,7 +532,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _ProfileStoriesSection extends StatefulWidget {
   final String userId;
   final bool isOwnProfile;
-  const _ProfileStoriesSection({required this.userId, required this.isOwnProfile});
+  final List<Map<String, dynamic>> cachedProgress;
+  final Function(List<Map<String, dynamic>>) onProgressLoaded;
+
+  const _ProfileStoriesSection({
+    required this.userId,
+    required this.isOwnProfile,
+    required this.cachedProgress,
+    required this.onProgressLoaded,
+  });
 
   @override
   State<_ProfileStoriesSection> createState() => _ProfileStoriesSectionState();
@@ -588,29 +549,35 @@ class _ProfileStoriesSection extends StatefulWidget {
 class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ReadingProgressService _progressService = ReadingProgressService();
-  bool _isLoading = true;
+  bool _isLoading = false;
   List<Map<String, dynamic>> _inProgressComics = [];
 
   @override
   void initState() {
     super.initState();
-    _loadReadingProgress();
+    if (widget.cachedProgress.isEmpty) {
+      _loadReadingProgress();
+    } else {
+      _inProgressComics = widget.cachedProgress;
+    }
   }
 
   Future<void> _loadReadingProgress() async {
+    if (_isLoading) return;
+
     setState(() {
       _isLoading = true;
     });
+
     try {
-      // Get all reading progress documents for the user
       final progressSnapshot = await _firestore
           .collection('users')
           .doc(widget.userId)
           .collection('readingProgress')
           .get();
 
-      // Group by comic ID
       final Map<String, List<DocumentSnapshot>> progressByComic = {};
+      final List<Map<String, dynamic>> inProgressComics = [];
 
       for (final doc in progressSnapshot.docs) {
         final data = doc.data();
@@ -624,9 +591,6 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
         }
       }
 
-      // Fetch comic details for each comic with progress
-      final List<Map<String, dynamic>> inProgressComics = [];
-
       for (final comicId in progressByComic.keys) {
         try {
           final comicDoc = await _firestore
@@ -636,16 +600,13 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
 
           if (comicDoc.exists) {
             final comic = Comic.fromFirestore(comicDoc);
-            // Load episodes from subcollection
             await comic.loadEpisodes();
-            
-            // Use ReadingProgressService to calculate progress
+
             final progress = await _progressService.getComicProgress(
               comicId,
               comic.episodes.length,
             );
 
-            // Find latest read timestamp
             DateTime latestTimestamp = DateTime(2000);
             for (final doc in progressByComic[comicId]!) {
               final data = doc.data() as Map<String, dynamic>;
@@ -668,9 +629,10 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
         }
       }
 
-      // Sort by last read time (most recent first)
       inProgressComics.sort((a, b) =>
           (b['lastReadAt'] as DateTime).compareTo(a['lastReadAt'] as DateTime));
+
+      widget.onProgressLoaded(inProgressComics);
 
       setState(() {
         _inProgressComics = inProgressComics;
@@ -703,7 +665,7 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
     return ListView.builder(
       shrinkWrap: true,
       physics: NeverScrollableScrollPhysics(),
-      itemCount: 3, // Show 3 shimmer cards
+      itemCount: 3,
       itemBuilder: (context, index) {
         return Shimmer.fromColors(
           baseColor: Colors.grey[900]!,
@@ -718,7 +680,6 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Cover image placeholder
                 Container(
                   width: 95,
                   height: 140,
@@ -736,28 +697,24 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Title placeholder
                         Container(
                           height: 20,
                           width: 150,
                           color: Colors.white,
                         ),
                         SizedBox(height: 8),
-                        // Author placeholder
                         Container(
                           height: 14,
                           width: 100,
                           color: Colors.white,
                         ),
                         SizedBox(height: 12),
-                        // Episodes placeholder
                         Container(
                           height: 14,
                           width: 80,
                           color: Colors.white,
                         ),
                         SizedBox(height: 12),
-                        // Progress row placeholders
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -774,13 +731,11 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
                           ],
                         ),
                         SizedBox(height: 8),
-                        // Progress bar placeholder
                         Container(
                           height: 3,
                           color: Colors.white,
                         ),
                         Spacer(),
-                        // Continue reading button placeholder
                         Align(
                           alignment: Alignment.centerRight,
                           child: Container(
@@ -803,7 +758,7 @@ class _ProfileStoriesSectionState extends State<_ProfileStoriesSection> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading && _inProgressComics.isEmpty) {
       return _buildShimmerLoading();
     }
     if (_inProgressComics.isEmpty) {

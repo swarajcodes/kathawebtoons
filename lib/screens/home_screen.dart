@@ -392,21 +392,20 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                             padding: const EdgeInsets.symmetric(horizontal: 16.0),
                             child: GridView.builder(
                               shrinkWrap: true,
-                              physics: NeverScrollableScrollPhysics(), // Optional: prevents scroll if nested in another scroll
+                              physics: const NeverScrollableScrollPhysics(),
                               itemCount: _cachedComics
                                   ?.where((c) => c.isRecommended && c.type != 'webnovel')
                                   .length ?? 0,
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3, // 2 cards per row
-                                crossAxisSpacing: 16, // horizontal space between columns
-                                // mainAxisSpacing: 16, // vertical space between rows
-                                childAspectRatio: 0.45, // controls height of each card
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 20, // Increased vertical spacing between rows
+                                childAspectRatio: 0.45,
                               ),
                               itemBuilder: (context, index) {
                                 final recommendedComics = _cachedComics
                                     ?.where((c) => c.isRecommended && c.type != 'webnovel')
-                                    .toList() ??
-                                    [];
+                                    .toList() ?? [];
 
                                 final comic = recommendedComics.isNotEmpty
                                     ? recommendedComics[index]

@@ -399,8 +399,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                 crossAxisCount: 3, // 2 cards per row
                                 crossAxisSpacing: 16, // horizontal space between columns
-                                // mainAxisSpacing: 16, // vertical space between rows
-                                childAspectRatio: 0.45, // controls height of each card
+                                mainAxisSpacing: 16, // vertical space between rows
+                                childAspectRatio: 0.39, // controls height of each card
                               ),
                               itemBuilder: (context, index) {
                                 final recommendedComics = _cachedComics
@@ -450,10 +450,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                                 ),
                               ),
                             ),
-                            SizedBox(height: 10),
+                            SizedBox(height: 20),
                             // Webnovels list with same container style
                             Container(
-                              height: 220,
+                              height: 290,
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
                                 padding: EdgeInsets.symmetric(horizontal: 16),

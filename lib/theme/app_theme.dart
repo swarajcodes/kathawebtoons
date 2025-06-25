@@ -69,10 +69,7 @@ class AppTheme {
       gradient: LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
-        colors: [
-          darkBackground.withOpacity(0.7),
-          Colors.transparent,
-        ],
+        colors: [darkBackground.withOpacity(0.7), Colors.transparent],
       ),
     );
   }
@@ -83,10 +80,7 @@ class AppTheme {
       gradient: LinearGradient(
         begin: Alignment.bottomCenter,
         end: Alignment.topCenter,
-        colors: [
-          darkBackground.withOpacity(0.7),
-          Colors.transparent,
-        ],
+        colors: [darkBackground.withOpacity(0.7), Colors.transparent],
       ),
     );
   }
@@ -94,10 +88,7 @@ class AppTheme {
   /// Builds an episode chip used in episode screens
   static Widget buildEpisodeChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 4,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: primaryColor.withOpacity(0.2),
         borderRadius: BorderRadius.circular(20),
@@ -115,13 +106,7 @@ class AppTheme {
 
   /// Builds a time chip used in episode screens
   static Widget buildTimeChip(String time) {
-    return Text(
-      time,
-      style: TextStyle(
-        color: secondaryColor,
-        fontSize: 12,
-      ),
-    );
+    return Text(time, style: TextStyle(color: secondaryColor, fontSize: 12));
   }
 
   /// Builds a progress indicator for episode reading
@@ -144,19 +129,15 @@ class AppTheme {
             children: [
               Text(
                 "${(progress * 100).toInt()}%",
-                style: TextStyle(
-                  color: secondaryColor,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: secondaryColor, fontSize: 12),
               ),
               Text(
                 "Scroll up to begin reading",
-                style: TextStyle(
-                  color: secondaryColor,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: secondaryColor, fontSize: 12),
               ),
-              buildTimeChip("${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}"),
+              buildTimeChip(
+                "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}",
+              ),
             ],
           ),
         ),
@@ -285,34 +266,23 @@ class AppTheme {
     backgroundColor: primaryColor,
     foregroundColor: darkBackground,
     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(30),
-    ),
-    textStyle: textTheme.titleMedium?.copyWith(
-      fontWeight: FontWeight.bold,
-    ),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    textStyle: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
   );
 
   static ButtonStyle get secondaryButtonStyle => ElevatedButton.styleFrom(
     backgroundColor: secondaryColor.withOpacity(0.3),
     foregroundColor: primaryColor,
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-    ),
-    textStyle: textTheme.titleSmall?.copyWith(
-      fontWeight: FontWeight.bold,
-    ),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    textStyle: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
   );
 
   // Card Styles
   static BoxDecoration get cardDecoration => BoxDecoration(
     color: darkBackground,
     borderRadius: BorderRadius.circular(12),
-    border: Border.all(
-      color: secondaryColor.withOpacity(0.3),
-      width: 1,
-    ),
+    border: Border.all(color: secondaryColor.withOpacity(0.3), width: 1),
   );
 
   // Input Decoration
@@ -336,9 +306,7 @@ class AppTheme {
       borderSide: BorderSide(color: errorColor),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    hintStyle: textTheme.bodyMedium?.copyWith(
-      color: secondaryColor,
-    ),
+    hintStyle: textTheme.bodyMedium?.copyWith(color: secondaryColor),
   );
 
   // App Theme
@@ -351,23 +319,15 @@ class AppTheme {
     appBarTheme: AppBarTheme(
       backgroundColor: darkBackground,
       elevation: 0,
-      titleTextStyle: textTheme.titleLarge?.copyWith(
-        color: lightText,
-      ),
-      iconTheme: const IconThemeData(
-        color: primaryColor,
-      ),
+      titleTextStyle: textTheme.titleLarge?.copyWith(color: lightText),
+      iconTheme: const IconThemeData(color: primaryColor),
     ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: primaryButtonStyle,
-    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(style: primaryButtonStyle),
     inputDecorationTheme: inputDecorationTheme,
     cardTheme: CardTheme(
       color: darkBackground,
       elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     dividerTheme: const DividerThemeData(
       color: secondaryColor,
@@ -383,14 +343,15 @@ class AppTheme {
   static Widget buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Text(
-        title,
-        style: textTheme.titleLarge,
-      ),
+      child: Text(title, style: textTheme.titleLarge),
     );
   }
 
-  static Widget buildChip(String label, {Color? backgroundColor, Color? textColor}) {
+  static Widget buildChip(
+    String label, {
+    Color? backgroundColor,
+    Color? textColor,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -408,11 +369,7 @@ class AppTheme {
   }
 
   static Widget buildLoadingIndicator() {
-    return const Center(
-      child: CircularProgressIndicator(
-        color: primaryColor,
-      ),
-    );
+    return const Center(child: CircularProgressIndicator(color: primaryColor));
   }
 
   static Widget buildErrorWidget(String message) {
@@ -420,17 +377,11 @@ class AppTheme {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            color: errorColor,
-            size: 48,
-          ),
+          const Icon(Icons.error_outline, color: errorColor, size: 48),
           const SizedBox(height: 16),
           Text(
             message,
-            style: textTheme.bodyLarge?.copyWith(
-              color: errorColor,
-            ),
+            style: textTheme.bodyLarge?.copyWith(color: errorColor),
           ),
         ],
       ),
@@ -441,17 +392,10 @@ class AppTheme {
   /// @param label The text to display in the chip
   static Widget buildGenreChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 10.0,
-        vertical: 4.0,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.5),
         borderRadius: BorderRadius.circular(4.0),
-        border: Border.all(
-          color: Color(0xFFA3D749),
-          width: 1.0,
-        ),
       ),
       child: Text(
         label,
@@ -468,10 +412,7 @@ class AppTheme {
   /// Used to highlight new content across the app
   static Widget buildNewTag() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 8.0,
-        vertical: 4.0,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       decoration: BoxDecoration(
         color: newTagColor,
         borderRadius: BorderRadius.circular(4.0),
@@ -488,12 +429,7 @@ class AppTheme {
             ),
           ),
           SizedBox(width: 2),
-          Text(
-            '✨',
-            style: TextStyle(
-              fontSize: 11,
-            ),
-          ),
+          Text('✨', style: TextStyle(fontSize: 11)),
         ],
       ),
     );
@@ -504,13 +440,10 @@ class AppTheme {
   static BoxDecoration buildGradientOverlay() {
     return BoxDecoration(
       gradient: LinearGradient(
-        colors: [
-          Colors.black.withOpacity(0.7),
-          Colors.transparent,
-        ],
+        colors: [Colors.black.withOpacity(0.7), Colors.transparent],
         begin: Alignment.bottomCenter,
         end: Alignment.topCenter,
       ),
     );
   }
-} 
+}

@@ -28,7 +28,7 @@ class EpisodeControlBar extends StatelessWidget {
         height: 48,
         margin: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFF505050).withOpacity(0.5),
+          color: const Color(0xFF505050).withOpacity(0.7),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Row(
@@ -50,16 +50,21 @@ class EpisodeControlBar extends StatelessWidget {
                 child: SliderTheme(
                   data: SliderThemeData(
                     trackHeight: 4,
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 12,
+                    ),
                     activeTrackColor: Colors.lightGreenAccent,
                     inactiveTrackColor: Colors.grey.shade600,
                     thumbColor: Colors.white,
                   ),
                   child: Slider(
-                    value: isHorizontalMode
-                        ? currentPage.toDouble()
-                        : scrollProgress * (totalPages - 1),
+                    value:
+                        isHorizontalMode
+                            ? currentPage.toDouble()
+                            : scrollProgress * (totalPages - 1),
                     min: 0,
                     max: (totalPages - 1).toDouble(),
                     divisions: totalPages > 1 ? totalPages - 1 : 1,

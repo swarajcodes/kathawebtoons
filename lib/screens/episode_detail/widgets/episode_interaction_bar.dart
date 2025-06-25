@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../../models/episode_stats_model.dart';
 import '../../../services/comments_service.dart';
-import '../../../widgets/comments_bottom_sheet.dart';
 import 'episode_interaction_button.dart';
 
 class EpisodeInteractionBar extends StatefulWidget {
@@ -127,7 +127,10 @@ class _EpisodeInteractionBarState extends State<EpisodeInteractionBar> {
                       builder: (context, snapshot) {
                         final likes = snapshot.data?.totalLikes ?? 0;
                         return EpisodeInteractionButton(
-                          icon: _localIsLiked ? Icons.favorite : Icons.favorite_border,
+                          icon:
+                              _localIsLiked
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
                           color: _localIsLiked ? Colors.red : Colors.white,
                           countText: likes.toString(),
                           onTap: _handleLike,
@@ -176,13 +179,13 @@ class _EpisodeInteractionBarState extends State<EpisodeInteractionBar> {
               width: 35,
               height: 70,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withOpacity(0.8),
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(15),
                   bottomLeft: Radius.circular(15),
                 ),
                 border: Border.all(
-                  color: Color(0xFFA3D749),
+                  color: Colors.white.withOpacity(0.15),
                   width: 1,
                 ),
               ),

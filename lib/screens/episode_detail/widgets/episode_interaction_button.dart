@@ -24,19 +24,12 @@ class EpisodeInteractionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Color(0xFFA3D749),
-            width: 1.0,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 0.5),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 26,
-            ),
+            Icon(icon, color: color, size: 26),
             if (countText != null) ...[
               const SizedBox(height: 4),
               Container(

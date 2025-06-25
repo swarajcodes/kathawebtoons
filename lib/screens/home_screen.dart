@@ -1,15 +1,14 @@
-import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/webnovel_episode.dart';
-import '../widgets/hero_carousel.dart';
-import '../widgets/comic_tile.dart';
-import '../widgets/cache_monitor.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
+
 import '../models/comic_model.dart';
+import '../models/webnovel_episode.dart';
 import '../utils/image_optimization.dart';
+import '../widgets/comic_tile.dart';
+import '../widgets/hero_carousel.dart';
 import 'comic_detail_screen.dart';
-import 'webnovel_episode_screen.dart';
 
 /// A singleton repository class that handles fetching and caching of comic data from Firestore.
 /// Implements caching strategies for both data and images to optimize performance.
@@ -21,15 +20,18 @@ class ComicRepository {
   ComicRepository._internal();
 
   // Cache storage for different comic categories
-  List<Comic> _comics = [];          // All comics
-  List<Comic> _heroComics = [];      // Featured comics for hero carousel
-  List<Comic> _recommendedComics = []; // Recommended comics for "For You" section
-  List<Comic> _webnovels = [];       // Webnovels category
+  List<Comic> _comics = []; // All comics
+  List<Comic> _heroComics = []; // Featured comics for hero carousel
+  List<Comic> _recommendedComics =
+      []; // Recommended comics for "For You" section
+  List<Comic> _webnovels = []; // Webnovels category
 
   // Cache control flags and timing
-  bool _isFetched = false;           // Track if initial fetch is complete
-  DateTime? _lastFetchTime;          // Last successful fetch timestamp
-  static const Duration _cacheExpiration = Duration(minutes: 5);  // Cache validity period
+  bool _isFetched = false; // Track if initial fetch is complete
+  DateTime? _lastFetchTime; // Last successful fetch timestamp
+  static const Duration _cacheExpiration = Duration(
+    minutes: 5,
+  ); // Cache validity period
 
   /// Checks if the current cache has expired
   bool get _isCacheExpired {
@@ -53,7 +55,9 @@ class ComicRepository {
   Future<List<Comic>> fetchComics({bool forceRefresh = false}) async {
     // Return cached data if valid
     if (!forceRefresh && _isFetched && !_isCacheExpired) {
-      print("Using cached comics data. Total comics: ${_comics.length}, Webnovels: ${_webnovels.length}");
+      print(
+        "Using cached comics data. Total comics: ${_comics.length}, Webnovels: ${_webnovels.length}",
+      );
       return _comics;
     }
 
@@ -66,7 +70,10 @@ class ComicRepository {
               .get(const GetOptions(source: Source.cache));
 
           if (cacheSnapshot.docs.isNotEmpty) {
-            _comics = cacheSnapshot.docs.map((doc) => Comic.fromFirestore(doc)).toList();
+            _comics =
+                cacheSnapshot.docs
+                    .map((doc) => Comic.fromFirestore(doc))
+                    .toList();
             print("Loaded from cache - Total comics: ${_comics.length}");
             _categorizeComics();
             print("After categorization - Webnovels: ${_webnovels.length}");
@@ -89,7 +96,6 @@ class ComicRepository {
       print("After categorization - Webnovels: ${_webnovels.length}");
       _isFetched = true;
       _lastFetchTime = DateTime.now();
-
     } catch (e) {
       print("Error fetching comics: $e");
       // Return cached data if available, otherwise throw
@@ -104,7 +110,10 @@ class ComicRepository {
   void _categorizeComics() {
     _heroComics = _comics.where((comic) => comic.isHero).toList();
     _recommendedComics = _comics.where((comic) => comic.isRecommended).toList();
-    _webnovels = _comics.where((comic) => comic.type == 'webnovel' || comic.isWebnovel).toList();
+    _webnovels =
+        _comics
+            .where((comic) => comic.type == 'webnovel' || comic.isWebnovel)
+            .toList();
   }
 
   // Getters for categorized comics
@@ -141,11 +150,12 @@ class ComicRepository {
 
       print("Found ${snapshot.docs.length} webnovel episodes");
 
-      final episodes = snapshot.docs.map((doc) {
-        final data = doc.data();
-        print("Processing webnovel episode: ${data['title']}");
-        return WebnovelEpisode.fromFirestore(doc);
-      }).toList();
+      final episodes =
+          snapshot.docs.map((doc) {
+            final data = doc.data();
+            print("Processing webnovel episode: ${data['title']}");
+            return WebnovelEpisode.fromFirestore(doc);
+          }).toList();
 
       // Update cache
       _webnovelEpisodesCache[comicId] = episodes;
@@ -153,9 +163,10 @@ class ComicRepository {
 
       // Implement LRU cache eviction
       if (_webnovelEpisodesCache.length > _maxCacheSize) {
-        final oldestKey = _webnovelEpisodesFetchTime.entries
-            .reduce((a, b) => a.value.isBefore(b.value) ? a : b)
-            .key;
+        final oldestKey =
+            _webnovelEpisodesFetchTime.entries
+                .reduce((a, b) => a.value.isBefore(b.value) ? a : b)
+                .key;
         _webnovelEpisodesCache.remove(oldestKey);
         _webnovelEpisodesFetchTime.remove(oldestKey);
       }
@@ -224,7 +235,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 /// State class for HomeScreen that handles data loading and UI rendering
-class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
   // Data management
   late Future<List<Comic>> _comicFuture;
   final _repository = ComicRepository();
@@ -290,24 +302,33 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final heroComics = comics.where((c) => c.isHero).toList();
     for (final comic in heroComics) {
       if (comic.heroLandscapeImage.isNotEmpty) {
-        await ImageOptimization.preloadImage(comic.heroLandscapeImage, context, type: 'hero');
+        await ImageOptimization.preloadImage(
+          comic.heroLandscapeImage,
+          context,
+          type: 'hero',
+        );
       }
       if (comic.coverImage.isNotEmpty) {
-        await ImageOptimization.preloadImage(comic.coverImage, context, type: 'cover');
+        await ImageOptimization.preloadImage(
+          comic.coverImage,
+          context,
+          type: 'cover',
+        );
       }
     }
 
     // 2. Recommended comics (second priority)
     final recommendedComics = comics.where((c) => c.isRecommended).toList();
-    final recommendedImageUrls = recommendedComics
-        .where((c) => c.coverImage.isNotEmpty)
-        .map((c) => c.coverImage)
-        .toList();
-    
+    final recommendedImageUrls =
+        recommendedComics
+            .where((c) => c.coverImage.isNotEmpty)
+            .map((c) => c.coverImage)
+            .toList();
+
     if (recommendedImageUrls.isNotEmpty) {
       await ImageOptimization.preloadImagesWithPriority(
-        recommendedImageUrls, 
-        context, 
+        recommendedImageUrls,
+        context,
         type: 'cover',
         maxConcurrent: 2,
       );
@@ -315,15 +336,16 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
     // 3. Webnovels (lower priority - may be below fold)
     final webnovels = comics.where((c) => c.type == 'webnovel').toList();
-    final webnovelImageUrls = webnovels
-        .where((c) => c.coverImage.isNotEmpty)
-        .map((c) => c.coverImage)
-        .toList();
-    
+    final webnovelImageUrls =
+        webnovels
+            .where((c) => c.coverImage.isNotEmpty)
+            .map((c) => c.coverImage)
+            .toList();
+
     if (webnovelImageUrls.isNotEmpty) {
       await ImageOptimization.preloadImagesWithPriority(
-        webnovelImageUrls, 
-        context, 
+        webnovelImageUrls,
+        context,
         type: 'cover',
         maxConcurrent: 1, // Lower concurrency for lower priority
       );
@@ -351,6 +373,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   @override
   Widget build(BuildContext context) {
     super.build(context);
+
+    // Responsive horizontal padding
+    double horizontalPadding = (MediaQuery.of(context).size.width * 0.04).clamp(
+      8.0,
+      32.0,
+    );
 
     return Scaffold(
       backgroundColor: Color(0xFF000000),
@@ -387,14 +415,22 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                             children: [
                               // Hero Carousel Section
                               HeroCarousel(
-                                heroComics: _cachedComics?.where((c) => c.isHero).toList() ?? [],
-                                onComicTap: (comic) => _navigateToDetail(context, comic),
+                                heroComics:
+                                    _cachedComics
+                                        ?.where((c) => c.isHero)
+                                        .toList() ??
+                                    [],
+                                onComicTap:
+                                    (comic) =>
+                                        _navigateToDetail(context, comic),
                               ),
                               SizedBox(height: 20),
 
                               // For You Section
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: horizontalPadding,
+                                ),
                                 child: Text(
                                   'For You ✨',
                                   style: TextStyle(
@@ -405,55 +441,86 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: horizontalPadding,
+                                ),
                                 child: GridView.builder(
                                   shrinkWrap: true,
                                   physics: NeverScrollableScrollPhysics(),
-                                  itemCount: _cachedComics
-                                      ?.where((c) => c.isRecommended && c.type != 'webnovel')
-                                      .length ?? 0,
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 3,
-                                    crossAxisSpacing: 16,
-                                    childAspectRatio: 0.45,
-                                  ),
+                                  itemCount:
+                                      _cachedComics
+                                          ?.where(
+                                            (c) =>
+                                                c.isRecommended &&
+                                                c.type != 'webnovel',
+                                          )
+                                          .length ??
+                                      0,
+                                  gridDelegate:
+                                      SliverGridDelegateWithMaxCrossAxisExtent(
+                                        maxCrossAxisExtent: 160,
+                                        mainAxisSpacing: 16,
+                                        crossAxisSpacing: 16,
+                                        childAspectRatio: 0.45,
+                                      ),
                                   itemBuilder: (context, index) {
-                                    final recommendedComics = _cachedComics
-                                        ?.where((c) => c.isRecommended && c.type != 'webnovel')
-                                        .toList() ??
+                                    final recommendedComics =
+                                        _cachedComics
+                                            ?.where(
+                                              (c) =>
+                                                  c.isRecommended &&
+                                                  c.type != 'webnovel',
+                                            )
+                                            .toList() ??
                                         [];
 
-                                    final comic = recommendedComics.isNotEmpty
-                                        ? recommendedComics[index]
-                                        : Comic(
-                                      id: 'default',
-                                      title: 'No Recommended Comic',
-                                      author: 'Unknown',
-                                      description: 'No description available',
-                                      coverImage: 'https://via.placeholder.com/150',
-                                      heroLandscapeImage: 'https://via.placeholder.com/150',
-                                      isHero: false,
-                                      isWebnovel: false,
-                                      episodes: [],
-                                      genre: [],
-                                      isRecommended: true,
-                                      isNew: false,
-                                      type: 'webtoon',
-                                    );
+                                    final comic =
+                                        recommendedComics.isNotEmpty
+                                            ? recommendedComics[index]
+                                            : Comic(
+                                              id: 'default',
+                                              title: 'No Recommended Comic',
+                                              author: 'Unknown',
+                                              description:
+                                                  'No description available',
+                                              coverImage:
+                                                  'https://via.placeholder.com/150',
+                                              heroLandscapeImage:
+                                                  'https://via.placeholder.com/150',
+                                              isHero: false,
+                                              isWebnovel: false,
+                                              episodes: [],
+                                              genre: [],
+                                              isRecommended: true,
+                                              isNew: false,
+                                              type: 'webtoon',
+                                            );
 
                                     return ComicTile(
                                       comic: comic,
-                                      onTap: () => _navigateToDetail(context, comic),
+                                      onTap:
+                                          () =>
+                                              _navigateToDetail(context, comic),
                                     );
                                   },
                                 ),
                               ),
 
                               // Webnovels Section
-                              if (_cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList().isNotEmpty == true) ...[
+                              if (_cachedComics
+                                      ?.where(
+                                        (c) =>
+                                            c.type == 'webnovel' ||
+                                            c.isWebnovel,
+                                      )
+                                      .toList()
+                                      .isNotEmpty ==
+                                  true) ...[
                                 SizedBox(height: 20),
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: horizontalPadding,
+                                  ),
                                   child: Text(
                                     'Explore Webnovels 📚',
                                     style: TextStyle(
@@ -468,24 +535,46 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                                   height: 280,
                                   child: ListView.builder(
                                     scrollDirection: Axis.horizontal,
-                                    padding: EdgeInsets.symmetric(horizontal: 16),
-                                    itemCount: _cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).length ?? 0,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: horizontalPadding,
+                                    ),
+                                    itemCount:
+                                        _cachedComics
+                                            ?.where(
+                                              (c) =>
+                                                  c.type == 'webnovel' ||
+                                                  c.isWebnovel,
+                                            )
+                                            .length ??
+                                        0,
                                     itemBuilder: (context, index) {
-                                      final webnovels = _cachedComics?.where((c) => c.type == 'webnovel' || c.isWebnovel).toList() ?? [];
+                                      final webnovels =
+                                          _cachedComics
+                                              ?.where(
+                                                (c) =>
+                                                    c.type == 'webnovel' ||
+                                                    c.isWebnovel,
+                                              )
+                                              .toList() ??
+                                          [];
                                       final comic = webnovels[index];
                                       return Container(
                                         width: 120,
                                         margin: EdgeInsets.only(right: 16),
                                         child: ComicTile(
                                           comic: comic,
-                                          onTap: () => _navigateToWebnovel(context, comic),
+                                          onTap:
+                                              () => _navigateToWebnovel(
+                                                context,
+                                                comic,
+                                              ),
                                         ),
                                       );
                                     },
                                   ),
                                 ),
                               ],
-                              
+
                               // Add bottom padding to create space from bottom navigation
                               SizedBox(height: 160),
                             ],
@@ -516,12 +605,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
           // For You section shimmer
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: EdgeInsets.symmetric(
+              horizontal: (MediaQuery.of(context).size.width * 0.04).clamp(
+                8.0,
+                32.0,
+              ),
+            ),
             child: Text(
               'For You ✨',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: Colors.white),
             ),
           ),
           SizedBox(height: 10),
@@ -531,12 +625,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
           // Webnovels section shimmer
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: EdgeInsets.symmetric(
+              horizontal: (MediaQuery.of(context).size.width * 0.04).clamp(
+                8.0,
+                32.0,
+              ),
+            ),
             child: Text(
               'Explore Webnovels 📚',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.white,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(color: Colors.white),
             ),
           ),
           SizedBox(height: 10),
@@ -565,15 +664,21 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   /// Builds a shimmer effect for horizontal scrolling lists
   /// Used for both "For You" and "Webnovels" sections
   Widget _buildGridShimmerPlaceholder() {
+    double horizontalPadding = (MediaQuery.of(context).size.width * 0.04).clamp(
+      8.0,
+      32.0,
+    );
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
       child: GridView.builder(
         shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(), // Disable scroll for embedding in another scroll view
+        physics:
+            NeverScrollableScrollPhysics(), // Disable scroll for embedding in another scroll view
         itemCount: 6, // Number of shimmer items
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3, // 2 cards per row
-          crossAxisSpacing: 16, // horizontal space between columns
+        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 160,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
           childAspectRatio: 0.45, // Adjust to match ComicTile proportions
         ),
         itemBuilder: (context, index) {
@@ -599,17 +704,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   height: 16,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                SizedBox(height: 4),
-                // Author placeholder
-                Container(
-                  width: 80,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                 ),
               ],
@@ -619,7 +714,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       ),
     );
   }
-
 
   /// Navigates to the appropriate detail screen based on comic type
   /// @param comic The comic to display
@@ -635,9 +729,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     // Navigate to ComicDetailScreen for both regular comics and webnovels
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ComicDetailScreen(comic: comic),
-      ),
+      MaterialPageRoute(builder: (context) => ComicDetailScreen(comic: comic)),
     );
   }
 
@@ -654,9 +746,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     // Navigate to ComicDetailScreen for webnovels
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ComicDetailScreen(comic: comic),
-      ),
+      MaterialPageRoute(builder: (context) => ComicDetailScreen(comic: comic)),
     );
   }
 }

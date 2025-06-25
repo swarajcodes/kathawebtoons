@@ -1,16 +1,14 @@
 import 'dart:async';
-import 'dart:ui';
+
 import 'package:flutter/material.dart';
+
 import '../models/comic_model.dart';
 
 class HeroCarousel extends StatefulWidget {
   final List<Comic> heroComics;
   final Function(Comic) onComicTap;
 
-  const HeroCarousel({
-    required this.heroComics,
-    required this.onComicTap,
-  });
+  const HeroCarousel({required this.heroComics, required this.onComicTap});
 
   @override
   _HeroCarouselState createState() => _HeroCarouselState();
@@ -84,15 +82,16 @@ class _HeroCarouselState extends State<HeroCarousel> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(
             widget.heroComics.length,
-                (index) => Container(
+            (index) => Container(
               margin: EdgeInsets.symmetric(horizontal: 4),
               width: 8,
               height: 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _currentPage == index
-                    ? Color(0xFFA3D749)
-                    : Colors.grey.withOpacity(0.5),
+                color:
+                    _currentPage == index
+                        ? Color(0xFFA3D749)
+                        : Colors.grey.withOpacity(0.5),
               ),
             ),
           ),
@@ -111,28 +110,27 @@ class HeroComicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = comic.isHero && comic.heroLandscapeImage.isNotEmpty
-        ? comic.heroLandscapeImage // Use landscape image if available
-        : comic.coverImage; // Fallback to portrait image
+    final imageUrl =
+        comic.isHero && comic.heroLandscapeImage.isNotEmpty
+            ? comic
+                .heroLandscapeImage // Use landscape image if available
+            : comic.coverImage; // Fallback to portrait image
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 200,
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-        ),
+        decoration: BoxDecoration(color: Colors.grey[900]),
         child: Stack(
           fit: StackFit.expand,
           children: [
             Image.network(
               imageUrl,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Icon(
-                Icons.error,
-                color: Colors.red,
-              ),
+              errorBuilder:
+                  (context, error, stackTrace) =>
+                      Icon(Icons.error, color: Colors.red),
             ),
             Container(
               padding: EdgeInsets.all(10),
@@ -161,41 +159,33 @@ class HeroComicCard extends StatelessWidget {
                     children: [
                       if (comic.genre.isNotEmpty)
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           margin: EdgeInsets.only(right: 4),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: Color(0xFFA3D749).withValues(alpha: 0.7),
-                              width: 1,
-                            ),
                           ),
                           child: Text(
                             comic.genre[0],
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 12),
                           ),
                         ),
                       if (comic.genre.length > 1)
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: Color(0xFFA3D749).withValues(alpha: 0.7),
-                              width: 1,
-                            ),
                           ),
                           child: Text(
                             comic.genre[1],
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 12),
                           ),
                         ),
                     ],

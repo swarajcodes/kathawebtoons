@@ -10,7 +10,7 @@ class ComicTile extends StatefulWidget {
   const ComicTile({
     Key? key,
     required this.comic,
-    required this.onTap,
+    required this.onTap, required bool showAuthor,
   }) : super(key: key);
 
   @override
@@ -31,7 +31,7 @@ class _ComicTileState extends State<ComicTile> {
   Future<void> _loadProgress() async {
     final progress = await _progressService.getComicProgress(
       widget.comic.id,
-      0, // Let the service fetch the correct episode count
+      0,
     );
 
     if (mounted) {
@@ -47,19 +47,20 @@ class _ComicTileState extends State<ComicTile> {
     return GestureDetector(
       onTap: () => widget.onTap(),
       child: Container(
-        width: 120, // Fixed width for the comic tile
+        width: 120,
+        margin: const EdgeInsets.only(bottom: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min, // Allow column to size to content
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              children: [
-                // Comic cover with opacity based on reading progress
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: SizedBox(
-                    width: 120, // Fixed width for the comic tile
-                    height: 160, // Fixed height for consistency
+            // Cover Image with Stack
+            SizedBox(
+              width: 120,
+              height: 160,
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
                     child: ImageOptimization.coverImage(
                       imageUrl: widget.comic.coverImage,
                       width: 120,
@@ -67,147 +68,147 @@ class _ComicTileState extends State<ComicTile> {
                       fit: BoxFit.cover,
                     ),
                   ),
+                  if (widget.comic.isWebnovel || widget.comic.type == 'webnovel')
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.menu_book,
+                              color: Color(0xFFA3D749),
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Webnovel',
+                              style: TextStyle(
+                                color: const Color(0xFFA3D749),
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  if (_progress > 0 && !_isLoading)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.55),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                value: _progress / 100,
+                                strokeWidth: 3,
+                                backgroundColor: Colors.grey[800],
+                                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFFA3D749)),
+                              ),
+                            ),
+                            Text(
+                              '${_progress.toInt()}%',
+                              style: TextStyle(
+                                color: const Color(0xFFA3D749),
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 10),
+
+
+
+            // Title and Author with Flexible to prevent overflow
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.comic.title,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 3),
 
-                // Webnovel indicator
-                if (widget.comic.isWebnovel || widget.comic.type == 'webnovel')
-                  Positioned(
-                    top: 8,
-                    left: 8,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.7),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.menu_book,
-                            color: Color(0xFFA3D749),
-                            size: 12,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Webnovel',
-                            style: TextStyle(
-                              color: Color(0xFFA3D749),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
+                // Genre chips
+                if (widget.comic.genre.isNotEmpty)
+                  SizedBox(
+                    height: 20,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: widget.comic.genre.length > 2 ? 2 : widget.comic.genre.length,
+                      itemBuilder: (context, index) {
+                        // Add comma after each genre except the last one
+                        final showComma = index < (widget.comic.genre.length > 2 ? 1 : widget.comic.genre.length - 1);
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              widget.comic.genre[index],
+                              style: TextStyle(
+                                color: Colors.grey[400],
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
-                      ),
+                            if (showComma)
+                              Text(
+                                ', ',
+                                style: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                          ],
+                        );
+                      },
                     ),
                   ),
-
-                // Progress indicator (circular with percentage)
-                if (_progress > 0 && !_isLoading)
-                  Positioned(
-                    bottom: 8,
-                    right: 8,
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.55), // Dimmed background for contrast
-                        shape: BoxShape.circle,
-                      ),
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              value: _progress / 100,
-                              strokeWidth: 3,
-                              backgroundColor: Colors.grey[800],
-                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFA3D749)),
-                            ),
-                          ),
-                          Text(
-                            '${_progress.toInt()}%',
-                            style: TextStyle(
-                              color: Color(0xFFA3D749),
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                // (
+                //   widget.comic.author,
+                //   style: TextStyle(
+                //     color: Colors.grey[400],
+                //     fontSize: 12,
+                //   ),
+                //   Text maxLines: 1,
+                //   overflow: TextOverflow.ellipsis,
+                // ),
               ],
-            ),
-            SizedBox(height: 6), // Reduced spacing
-            
-            // Genre pills
-            if (widget.comic.genre.isNotEmpty)
-              Container(
-                height: 20,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: widget.comic.genre.length > 2 ? 2 : widget.comic.genre.length,
-                  itemBuilder: (context, index) {
-                    return Container(
-                      margin: EdgeInsets.only(right: 4),
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Color(0xFFA3D749).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Color(0xFFA3D749).withValues(alpha: 0.5),
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Text(
-                        widget.comic.genre[index],
-                        style: TextStyle(
-                          color: Color(0xFFA3D749),
-                          fontSize: 9,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            
-            SizedBox(height: 4),
-            
-            // Title with flexible space allocation
-            Flexible(
-              child: Text(
-                widget.comic.title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            
-            // Ensure proper spacing between title and author
-            SizedBox(height: 2),
-            
-            // Author text that starts after title
-            Flexible(
-              child: Text(
-                widget.comic.author,
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+            )
           ],
         ),
       ),
